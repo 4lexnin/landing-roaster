@@ -3,6 +3,8 @@ import * as cheerio from "cheerio";
 import OpenAI from "openai";
 import { computeScore } from "@/lib/scoring";
 import { ScrapedData, RoastResult } from "@/lib/types";
+import { checkRateLimit } from "@/lib/rateLimit";
+import { getCached, setCache } from "@/lib/cache";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -108,6 +110,19 @@ Return exactly this JSON structure (no markdown, no explanation):
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limiting
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+      req.headers.get("x-real-ip") ??
+      "unknown";
+    const { allowed } = checkRateLimit(ip);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. You can roast up to 5 pages per hour." },
+        { status: 429 }
+      );
+    }
+
     const { url } = await req.json();
     if (!url || typeof url !== "string") {
       return NextResponse.json({ error: "URL is required" }, { status: 400 });
@@ -115,6 +130,12 @@ export async function POST(req: NextRequest) {
 
     // Normalize URL
     const normalizedUrl = url.startsWith("http") ? url : `https://${url}`;
+
+    // Cache check
+    const cached = getCached(normalizedUrl);
+    if (cached) {
+      return NextResponse.json({ ...cached, cached: true });
+    }
 
     const scraped = await scrape(normalizedUrl);
     const score = computeScore(scraped);
@@ -126,6 +147,8 @@ export async function POST(req: NextRequest) {
       score,
       llm,
     };
+
+    setCache(normalizedUrl, result);
 
     return NextResponse.json(result);
   } catch (err) {

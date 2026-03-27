@@ -1,17 +1,40 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { RoastResults } from "@/components/RoastResults";
 import { RoastResult } from "@/lib/types";
 
 type State = "idle" | "loading" | "done" | "error";
+
+const STEPS = [
+  "Scraping your page...",
+  "Running heuristics...",
+  "Scoring 5 categories...",
+  "Generating roast...",
+];
 
 export default function Home() {
   const [url, setUrl] = useState("");
   const [state, setState] = useState<State>("idle");
   const [result, setResult] = useState<RoastResult | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const [stepIndex, setStepIndex] = useState(0);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const stepInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (state === "loading") {
+      setStepIndex(0);
+      stepInterval.current = setInterval(() => {
+        setStepIndex((i) => Math.min(i + 1, STEPS.length - 1));
+      }, 3500);
+    } else {
+      if (stepInterval.current) clearInterval(stepInterval.current);
+    }
+    return () => {
+      if (stepInterval.current) clearInterval(stepInterval.current);
+    };
+  }, [state]);
 
   async function handleRoast(e: React.FormEvent) {
     e.preventDefault();
@@ -94,14 +117,41 @@ export default function Home() {
             )}
           </form>
 
+          {/* Loading steps */}
+          {state === "loading" && (
+            <div className="flex flex-col items-center gap-2">
+              {STEPS.map((step, i) => (
+                <div
+                  key={step}
+                  className={`flex items-center gap-2 text-sm transition-all duration-500 ${
+                    i < stepIndex
+                      ? "text-gray-300 line-through"
+                      : i === stepIndex
+                      ? "text-gray-700 font-medium"
+                      : "text-gray-300"
+                  }`}
+                >
+                  {i < stepIndex && <span>✓</span>}
+                  {i === stepIndex && (
+                    <span className="w-3 h-3 border-2 border-gray-400 border-t-gray-700 rounded-full animate-spin" />
+                  )}
+                  {i > stepIndex && <span className="w-3 h-3" />}
+                  {step}
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Social proof hint */}
-          <p className="text-center text-xs text-gray-400">
-            No account needed · Takes ~15 seconds · Powered by GPT-4o mini
-          </p>
+          {state !== "loading" && (
+            <p className="text-center text-xs text-gray-400">
+              No account needed · Takes ~15 seconds · Powered by GPT-4o mini
+            </p>
+          )}
         </div>
       </section>
 
-      {/* Divider when results show */}
+      {/* Results */}
       {state === "done" && result && (
         <div ref={resultsRef} className="px-4">
           <div className="max-w-2xl mx-auto border-t border-gray-100 mb-8" />
