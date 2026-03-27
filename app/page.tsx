@@ -73,8 +73,8 @@ export default function Home() {
         <div className="w-full max-w-2xl space-y-10">
           {/* Wordmark */}
           <div className="text-center space-y-3">
-            <div className="inline-flex items-center gap-2 text-xs font-medium text-gray-400 uppercase tracking-widest bg-white border border-gray-100 rounded-full px-3 py-1">
-              <span className="w-1.5 h-1.5 bg-red-400 rounded-full" />
+            <div className="inline-flex items-center gap-2 text-xs font-medium text-white uppercase tracking-widest bg-red-500 rounded-full px-3 py-1">
+              <span className="w-1.5 h-1.5 bg-white rounded-full" />
               Free roast
             </div>
             <h1 className="text-4xl font-bold text-gray-900 tracking-tight">
@@ -155,7 +155,15 @@ export default function Home() {
       {state === "done" && result && (
         <div ref={resultsRef} className="px-4">
           <div className="max-w-2xl mx-auto border-t border-gray-100 mb-8" />
-          <RoastResults result={result} />
+          <RoastResults
+            result={result}
+            onRoastAnother={() => {
+              setState("idle");
+              setResult(null);
+              setUrl("");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+          />
         </div>
       )}
     </main>

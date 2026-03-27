@@ -6,6 +6,7 @@ import { ScoreBar } from "./ScoreBar";
 
 interface Props {
   result: RoastResult;
+  onRoastAnother: () => void;
 }
 
 const categoryMeta = {
@@ -16,7 +17,7 @@ const categoryMeta = {
   trust: { label: "Trust", description: "Any proof or credibility?" },
 };
 
-export function RoastResults({ result }: Props) {
+export function RoastResults({ result, onRoastAnother }: Props) {
   const { url, score, llm } = result;
   const hostname = (() => {
     try {
@@ -136,6 +137,16 @@ export function RoastResults({ result }: Props) {
           placeholder="Add a competitor URL..."
           className="w-full text-sm border border-gray-100 rounded-lg px-3 py-2 bg-gray-50 text-gray-400 cursor-not-allowed"
         />
+      </div>
+
+      {/* Roast another */}
+      <div className="flex justify-center">
+        <button
+          onClick={onRoastAnother}
+          className="bg-gray-900 text-white text-sm font-medium px-6 py-3 rounded-xl hover:bg-gray-700 transition-colors"
+        >
+          Roast another page
+        </button>
       </div>
     </div>
   );
