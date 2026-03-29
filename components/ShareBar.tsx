@@ -7,8 +7,8 @@ interface Props {
   result: RoastResult;
 }
 
-function buildShareText(hostname: string, score: number): string {
-  return `I just roasted my landing page (${hostname}) and scored ${score}/10 🍞\n\nGet your free roast 👇`;
+function buildShareText(score: number): string {
+  return `Just got a brutal ${score}/10 roast of my landing page 🍞\n\nGet yours free 👇`;
 }
 
 export function ShareBar({ result }: Props) {
@@ -33,7 +33,7 @@ export function ShareBar({ result }: Props) {
 
   const shareUrl = `${window.location.origin}/r?${shareParams}`;
   const imageUrl = `/api/share-image?${shareParams}`;
-  const shareText = buildShareText(hostname, total_score);
+  const shareText = buildShareText(total_score);
 
   function handleCopy() {
     navigator.clipboard.writeText(shareText + "\n" + shareUrl);

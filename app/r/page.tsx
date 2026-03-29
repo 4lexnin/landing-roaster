@@ -24,7 +24,9 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
     trust = "0",
   } = params;
 
-  const baseUrl = process.env.VERCEL_URL
+  const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}`
     : "http://localhost:3001";
 
