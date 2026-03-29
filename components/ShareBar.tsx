@@ -31,7 +31,7 @@ export function ShareBar({ result }: Props) {
     trust: String(breakdown.trust),
   });
 
-  const shareUrl = `${window.location.origin}/r?${shareParams}`;
+  const shareUrl = window.location.origin;
   const imageUrl = `/api/share-image?${shareParams}`;
   const shareText = buildShareText(total_score);
 
