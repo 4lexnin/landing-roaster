@@ -109,7 +109,7 @@ export default function Home() {
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="Paste your landing page URL"
-                className="flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 px-3 py-2 outline-none"
+                className="flex-1 bg-transparent text-base text-gray-900 placeholder-gray-400 px-3 py-2 outline-none"
                 disabled={state === "loading"}
                 autoFocus
               />
