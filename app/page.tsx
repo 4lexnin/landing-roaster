@@ -7,6 +7,16 @@ import { RoastResult } from "@/lib/types";
 
 type State = "idle" | "loading" | "done" | "error";
 
+async function fetchRoastCount(): Promise<number> {
+  try {
+    const res = await fetch("/api/counter", { cache: "no-store" });
+    const data = await res.json();
+    return data.count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 const STEPS = [
   "Scraping your page...",
   "Running heuristics...",
@@ -20,8 +30,13 @@ export default function Home() {
   const [result, setResult] = useState<RoastResult | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [stepIndex, setStepIndex] = useState(0);
+  const [roastCount, setRoastCount] = useState<number | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const stepInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    fetchRoastCount().then(setRoastCount);
+  }, []);
 
   useEffect(() => {
     if (state === "loading") {
@@ -149,7 +164,11 @@ export default function Home() {
           {/* Social proof hint */}
           {state !== "loading" && (
             <p className="text-center text-xs text-gray-400">
-              No account needed · Takes ~15 seconds · Powered by GPT-4o mini
+              No account needed
+              {roastCount !== null && roastCount > 0 && (
+                <> · <span className="text-gray-500 font-medium">{roastCount.toLocaleString()} pages roasted</span></>
+              )}
+              {" "}· Powered by GPT-4o mini
             </p>
           )}
         </div>

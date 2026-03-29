@@ -150,6 +150,9 @@ export async function POST(req: NextRequest) {
 
     setCache(normalizedUrl, result);
 
+    // Increment roast counter (fire and forget)
+    import("@upstash/redis").then(({ Redis }) => Redis.fromEnv().incr("roast_count")).catch(() => {});
+
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

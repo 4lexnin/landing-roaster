@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RoastResult } from "@/lib/types";
 
 interface Props {
@@ -14,6 +14,11 @@ function buildShareText(score: number): string {
 export function ShareBar({ result }: Props) {
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [canNativeShare, setCanNativeShare] = useState(false);
+
+  useEffect(() => {
+    setCanNativeShare(typeof navigator !== "undefined" && !!navigator.share);
+  }, []);
 
   const hostname = (() => {
     try { return new URL(result.url).hostname; } catch { return result.url; }
@@ -56,6 +61,12 @@ export function ShareBar({ result }: Props) {
     }
   }
 
+  async function handleNativeShare() {
+    try {
+      await navigator.share({ title: `${hostname} scored ${total_score}/10`, text: shareText, url: shareUrl });
+    } catch { /* cancelled */ }
+  }
+
   const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
   const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`;
 
@@ -73,6 +84,18 @@ export function ShareBar({ result }: Props) {
 
       {/* Buttons */}
       <div className="flex gap-2 flex-wrap">
+        {canNativeShare && (
+          <button
+            onClick={handleNativeShare}
+            className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg text-white transition-colors"
+            style={{ backgroundColor: "#92400e" }}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+            Share
+          </button>
+        )}
         <button
           onClick={handleDownload}
           disabled={downloading}
