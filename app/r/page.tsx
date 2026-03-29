@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { headers } from "next/headers";
 
 interface Props {
   searchParams: Promise<{
@@ -24,11 +25,10 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
     trust = "0",
   } = params;
 
-  const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3001";
+  const headersList = await headers();
+  const host = headersList.get("host") ?? "localhost:3001";
+  const proto = host.includes("localhost") ? "http" : "https";
+  const baseUrl = `${proto}://${host}`;
 
   const imageParams = new URLSearchParams({ hostname, score, clarity, value, structure, conversion, trust });
   const imageUrl = `${baseUrl}/api/share-image?${imageParams}`;
