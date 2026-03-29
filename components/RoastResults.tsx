@@ -3,6 +3,7 @@
 import { RoastResult } from "@/lib/types";
 import { ScoreRing } from "./ScoreRing";
 import { ScoreBar } from "./ScoreBar";
+import { ShareBar } from "./ShareBar";
 
 interface Props {
   result: RoastResult;
@@ -104,8 +105,11 @@ export function RoastResults({ result, onRoastAnother }: Props) {
       </div>
 
 
+      {/* Share */}
+      <ShareBar result={result} />
+
       {/* Teaser */}
-      <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-3 opacity-70">
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 space-y-3 opacity-80">
         <div className="flex items-center gap-2">
           <span className="text-base">🔒</span>
           <h2 className="text-sm font-semibold text-gray-700">
