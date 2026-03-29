@@ -22,13 +22,13 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Landing Page Roaster — Brutally honest feedback in 30s",
     description: "Get a brutally honest, AI-powered critique of your landing page in 30 seconds. Free. No signup.",
-    images: [{ url: `${baseUrl}/api/share-image?default=1`, width: 1200, height: 630, type: "image/png" }],
+    images: [{ url: `${baseUrl}/og-image.png`, width: 1200, height: 630, type: "image/png" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Landing Page Roaster — Brutally honest feedback in 30s",
     description: "Get a brutally honest, AI-powered critique of your landing page in 30 seconds.",
-    images: [`${baseUrl}/api/share-image?default=1`],
+    images: [`${baseUrl}/og-image.png`],
   },
 };
 
