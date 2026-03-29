@@ -133,7 +133,7 @@ export function RoastResults({ result, onRoastAnother }: Props) {
       <div className="flex justify-center">
         <button
           onClick={onRoastAnother}
-          className="text-white text-sm font-medium px-6 py-3 rounded-xl transition-colors" style={{ backgroundColor: "#ea580c" }}
+          className="text-white text-sm font-medium px-6 py-3 rounded-xl transition-colors" style={{ backgroundColor: "#b45309" }}
         >
           Roast another page
         </button>

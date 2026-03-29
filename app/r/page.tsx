@@ -68,7 +68,7 @@ export default async function ResultPage({ searchParams }: Props) {
       </p>
       <a
         href="/"
-        className="text-white text-sm font-medium px-6 py-3 rounded-xl transition-colors" style={{ backgroundColor: "#ea580c" }}
+        className="text-white text-sm font-medium px-6 py-3 rounded-xl transition-colors" style={{ backgroundColor: "#b45309" }}
       >
         Roast my page →
       </a>

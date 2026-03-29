@@ -74,7 +74,7 @@ export default function Home() {
         <div className="w-full max-w-2xl space-y-10">
           {/* Wordmark */}
           <div className="text-center space-y-3">
-            <div className="inline-flex items-center gap-2 text-xs font-medium text-white uppercase tracking-widest bg-stone-900 rounded-full px-3 py-1">
+            <div className="inline-flex items-center gap-2 text-xs font-medium text-white uppercase tracking-widest rounded-full px-3 py-1" style={{ backgroundColor: "#d97706" }}>
               <span className="w-1.5 h-1.5 bg-white rounded-full" />
               Free roast
             </div>
@@ -102,9 +102,9 @@ export default function Home() {
                 type="submit"
                 disabled={state === "loading" || !url.trim()}
                 className="text-white text-sm font-medium px-5 py-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                style={{ backgroundColor: "#ea580c" }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#c2410c")}
-                onMouseLeave={e => (e.currentTarget.style.backgroundColor = "#ea580c")}
+                style={{ backgroundColor: "#92400e" }}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#78350f")}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = "#92400e")}
               >
                 {state === "loading" ? (
                   <span className="flex items-center gap-2">
