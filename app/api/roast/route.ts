@@ -150,8 +150,15 @@ export async function POST(req: NextRequest) {
 
     setCache(normalizedUrl, result);
 
-    // Increment roast counter (fire and forget)
-    import("@upstash/redis").then(({ Redis }) => Redis.fromEnv().incr("roast_count")).catch(() => {});
+    // Increment roast counter + update leaderboard (fire and forget)
+    import("@upstash/redis").then(({ Redis }) => {
+      const redis = Redis.fromEnv();
+      const hostname = new URL(normalizedUrl).hostname;
+      return Promise.all([
+        redis.incr("roast_count"),
+        redis.zadd("leaderboard", { score: result.score.total_score, member: hostname }),
+      ]);
+    }).catch(() => {});
 
     return NextResponse.json(result);
   } catch (err) {
