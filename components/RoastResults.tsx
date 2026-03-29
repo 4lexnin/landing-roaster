@@ -3,7 +3,6 @@
 import { RoastResult } from "@/lib/types";
 import { ScoreRing } from "./ScoreRing";
 import { ScoreBar } from "./ScoreBar";
-import { ShareBar } from "./ShareBar";
 
 interface Props {
   result: RoastResult;
@@ -104,23 +103,6 @@ export function RoastResults({ result, onRoastAnother }: Props) {
         </ul>
       </div>
 
-      {/* Rewritten Headline */}
-      <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-          Rewritten Headline
-        </h2>
-        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
-          <p className="text-base font-semibold text-gray-900 leading-snug">
-            &ldquo;{llm.rewritten_headline}&rdquo;
-          </p>
-        </div>
-        <p className="text-xs text-gray-400">
-          Original: &ldquo;{result.scraped.headline}&rdquo;
-        </p>
-      </div>
-
-      {/* Share */}
-      <ShareBar result={result} />
 
       {/* Teaser */}
       <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-3 opacity-70">
@@ -147,7 +129,7 @@ export function RoastResults({ result, onRoastAnother }: Props) {
       <div className="flex justify-center">
         <button
           onClick={onRoastAnother}
-          className="bg-gray-900 text-white text-sm font-medium px-6 py-3 rounded-xl hover:bg-gray-700 transition-colors"
+          className="bg-amber-800 text-white text-sm font-medium px-6 py-3 rounded-xl hover:bg-amber-900 transition-colors"
         >
           Roast another page
         </button>

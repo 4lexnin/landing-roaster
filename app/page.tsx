@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { RoastResults } from "@/components/RoastResults";
+import { SharePopup } from "@/components/SharePopup";
 import { RoastResult } from "@/lib/types";
 
 type State = "idle" | "loading" | "done" | "error";
@@ -100,7 +101,7 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={state === "loading" || !url.trim()}
-                className="bg-gray-900 text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="bg-amber-800 text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-amber-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 {state === "loading" ? (
                   <span className="flex items-center gap-2">
@@ -164,6 +165,7 @@ export default function Home() {
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
           />
+          <SharePopup result={result} />
         </div>
       )}
     </main>

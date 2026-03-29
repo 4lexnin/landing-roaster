@@ -42,7 +42,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
     openGraph: {
       title,
       description,
-      images: [{ url: imageUrl, width: 1200, height: 630, alt: title }],
+      images: [{ url: imageUrl, width: 1200, height: 630, alt: title, type: "image/png" }],
     },
     twitter: {
       card: "summary_large_image",
@@ -68,7 +68,7 @@ export default async function ResultPage({ searchParams }: Props) {
       </p>
       <a
         href="/"
-        className="bg-gray-900 text-white text-sm font-medium px-6 py-3 rounded-xl hover:bg-gray-700 transition-colors"
+        className="bg-amber-800 text-white text-sm font-medium px-6 py-3 rounded-xl hover:bg-amber-900 transition-colors"
       >
         Roast my page →
       </a>
