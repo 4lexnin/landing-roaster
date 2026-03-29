@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 48 }}>
           <div style={{ display: "flex", fontSize: 26 }}>🍞</div>
           <div style={{ display: "flex", fontSize: 17, fontWeight: 700, color: "#111827" }}>Landing Page Roaster</div>
-          <div style={{ display: "flex", marginLeft: "auto", background: "#ef4444", color: "white", fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 999, letterSpacing: 1 }}>
+          <div style={{ display: "flex", marginLeft: "auto", background: "#1c1917", color: "white", fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 999, letterSpacing: 1 }}>
             FREE ROAST
           </div>
         </div>
