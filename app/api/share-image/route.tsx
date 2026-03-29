@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 function Bar({ label, score }: { label: string; score: number }) {
   const color = score >= 7 ? "#16a34a" : score >= 5 ? "#d97706" : "#dc2626";
@@ -77,6 +77,12 @@ export async function GET(req: NextRequest) {
 
       </div>
     ),
-    { width: 1200, height: 630 }
+    {
+      width: 1200,
+      height: 630,
+      headers: {
+        "Cache-Control": "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800",
+      },
+    }
   );
 }
