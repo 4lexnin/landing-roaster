@@ -49,6 +49,8 @@ function scoreColor(score: number) {
 export default function Home() {
   const { isSignedIn, user } = useUser();
   const [tab, setTab] = useState<Tab>("roast");
+  const [isPro, setIsPro] = useState(false);
+  const [proActivating, setProActivating] = useState(false);
   const [url, setUrl] = useState("");
   const [state, setState] = useState<State>("idle");
   const [result, setResult] = useState<RoastResult | null>(null);
@@ -68,24 +70,58 @@ export default function Home() {
       try {
         setResult(JSON.parse(saved));
         setState("done");
-        sessionStorage.removeItem("pendingRoastResult");
+        // keep in sessionStorage so it survives Stripe redirect too
       } catch { /* ignore */ }
     }
   }, []);
 
-  // Auto-trigger Stripe checkout after sign-in if user clicked "Unlock" before signing in
+  // Fetch Pro status + handle post-Stripe upgrade
   useEffect(() => {
     if (!isSignedIn || !user) return;
-    const pending = sessionStorage.getItem("pendingCheckout");
-    if (!pending) return;
-    sessionStorage.removeItem("pendingCheckout");
-    fetch("/api/stripe/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, userEmail: user.primaryEmailAddress?.emailAddress }),
-    })
+
+    const params = new URLSearchParams(window.location.search);
+    const justUpgraded = params.get("upgraded") === "1";
+
+    if (justUpgraded) {
+      // Remove query param from URL cleanly
+      window.history.replaceState({}, "", "/");
+      setProActivating(true);
+      // Poll until webhook has activated the subscription (up to 10s)
+      let attempts = 0;
+      const poll = setInterval(() => {
+        fetch(`/api/subscription?userId=${user.id}`)
+          .then(r => r.json())
+          .then(d => {
+            if (d.active) {
+              setIsPro(true);
+              setProActivating(false);
+              clearInterval(poll);
+            } else if (++attempts >= 5) {
+              setProActivating(false);
+              clearInterval(poll);
+            }
+          });
+      }, 2000);
+      return () => clearInterval(poll);
+    }
+
+    // Normal subscription check
+    fetch(`/api/subscription?userId=${user.id}`)
       .then(r => r.json())
-      .then(({ url: checkoutUrl }) => { if (checkoutUrl) window.location.href = checkoutUrl; });
+      .then(d => setIsPro(d.active));
+
+    // Auto-trigger Stripe checkout if user clicked "Unlock" before signing in
+    const pending = sessionStorage.getItem("pendingCheckout");
+    if (pending) {
+      sessionStorage.removeItem("pendingCheckout");
+      fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, userEmail: user.primaryEmailAddress?.emailAddress }),
+      })
+        .then(r => r.json())
+        .then(({ url: checkoutUrl }) => { if (checkoutUrl) window.location.href = checkoutUrl; });
+    }
   }, [isSignedIn, user]);
 
   useEffect(() => {
@@ -311,11 +347,14 @@ export default function Home() {
           <div className="max-w-2xl mx-auto border-t border-gray-100 mb-8" />
           <RoastResults
             result={result}
+            isPro={isPro}
+            proActivating={proActivating}
             onRoastAnother={() => {
               setState("idle");
               setResult(null);
               setUrl("");
               sessionStorage.removeItem("pendingRoastResult");
+              sessionStorage.removeItem("pendingCheckout");
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
           />

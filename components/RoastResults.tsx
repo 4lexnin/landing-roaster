@@ -5,10 +5,12 @@ import { ScoreRing } from "./ScoreRing";
 import { ScoreBar } from "./ScoreBar";
 import { ShareBar } from "./ShareBar";
 import { useUser, SignInButton } from "@clerk/nextjs";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 interface Props {
   result: RoastResult;
+  isPro: boolean;
+  proActivating: boolean;
   onRoastAnother: () => void;
 }
 
@@ -20,10 +22,9 @@ const categoryMeta = {
   trust: { label: "Trust", description: "Any proof or credibility?" },
 };
 
-export function RoastResults({ result, onRoastAnother }: Props) {
+export function RoastResults({ result, isPro, proActivating, onRoastAnother }: Props) {
   const { url, score, llm } = result;
   const { isSignedIn, user } = useUser();
-  const [isPro, setIsPro] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
 
   const hostname = (() => {
@@ -33,13 +34,6 @@ export function RoastResults({ result, onRoastAnother }: Props) {
       return url;
     }
   })();
-
-  useEffect(() => {
-    if (!user?.id) return;
-    fetch(`/api/subscription?userId=${user.id}`)
-      .then(r => r.json())
-      .then(d => setIsPro(d.active));
-  }, [user?.id]);
 
   async function handleUpgrade() {
     if (!isSignedIn) return;
@@ -153,8 +147,13 @@ export function RoastResults({ result, onRoastAnother }: Props) {
           )}
         </div>
 
-        {isPro ? (
-          <p className="text-xs text-green-600 font-medium">✓ You have Pro access — competitor comparison coming next.</p>
+        {proActivating ? (
+          <div className="flex items-center gap-2 text-xs text-amber-700">
+            <span className="w-3.5 h-3.5 border-2 border-amber-300 border-t-amber-700 rounded-full animate-spin" />
+            Activating Pro access...
+          </div>
+        ) : isPro ? (
+          <p className="text-xs text-green-600 font-medium">✓ Pro access active — competitor comparison coming next.</p>
         ) : !isSignedIn ? (
           <SignInButton mode="modal">
             <button
