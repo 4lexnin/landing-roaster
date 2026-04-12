@@ -507,49 +507,6 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Change history */}
-              {(historyLoading || changeHistory.length > 0) && (
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Change history</p>
-                  {historyLoading ? (
-                    <div className="flex justify-center py-8">
-                      <span className="w-4 h-4 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin" />
-                    </div>
-                  ) : (
-                    <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
-                      {changeHistory.map((c) => {
-                        const changeAsChange: Change = {
-                          type: c.change_type,
-                          from: c.from_value ?? undefined,
-                          to: c.to_value ?? undefined,
-                          value: c.value ?? undefined,
-                          added: c.added ?? undefined,
-                        };
-                        const cfg = changeLabels[c.change_type];
-                        return (
-                          <div key={c.id} className="flex items-start gap-3 px-5 py-3.5">
-                            <span className="text-sm mt-0.5">{cfg.icon}</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-semibold text-gray-500">{c.competitors?.hostname}</span>
-                                <span className="text-xs text-gray-300">·</span>
-                                <span className="text-xs text-gray-400">{timeAgo(c.detected_at)}</span>
-                              </div>
-                              <p className={`text-sm font-medium mt-0.5 ${cfg.text}`}>{cfg.label(changeAsChange)}</p>
-                              {c.change_type === "headline" && (
-                                <div className="text-xs mt-1 space-y-0.5">
-                                  <p className="text-gray-400 line-through">{c.from_value}</p>
-                                  <p className="text-gray-700 font-medium">{c.to_value}</p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Monitor results */}
               {monitorResults && (
@@ -586,11 +543,41 @@ export default function Dashboard() {
                       {result.error && <p className="text-sm text-red-500">{result.error}</p>}
 
                       {!result.error && (
-                        <div className="space-y-5">
+                        <div className="space-y-4">
 
-                          {/* Score bar */}
+                          {/* Score + profile inline grid */}
+                          <div className="grid grid-cols-2 gap-x-8 gap-y-2.5">
+                            {result.profile?.target_audience && (
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Target</p>
+                                <p className="text-sm text-gray-700">{result.profile.target_audience}</p>
+                              </div>
+                            )}
+                            {result.profile?.positioning && (
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Positioning</p>
+                                <p className="text-sm text-gray-700">{result.profile.positioning}</p>
+                              </div>
+                            )}
+                            {result.profile?.strategy && (
+                              <div className="col-span-2">
+                                <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Strategy signal</p>
+                                <p className="text-sm text-gray-700">{result.profile.strategy}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Opportunity */}
+                          {result.profile?.opportunities && (
+                            <div className="rounded-xl bg-amber-50 border border-amber-100 px-3.5 py-3 flex items-start gap-2">
+                              <span className="text-sm mt-0.5">💡</span>
+                              <p className="text-sm text-amber-800">{result.profile.opportunities}</p>
+                            </div>
+                          )}
+
+                          {/* Score breakdown */}
                           {result.score.total_score > 0 && (
-                            <div className="grid grid-cols-5 gap-2 pb-1">
+                            <div className="grid grid-cols-5 gap-2 pt-1 border-t border-gray-50">
                               {(["clarity", "value", "structure", "conversion", "trust"] as const).map(key => (
                                 <div key={key} className="text-center">
                                   <p className={`text-sm font-bold tabular-nums ${scoreColor(result.score.breakdown[key])}`}>{result.score.breakdown[key]}</p>
@@ -600,114 +587,63 @@ export default function Dashboard() {
                             </div>
                           )}
 
-                          {/* Competitive profile */}
-                          {(result.profile?.target_audience || result.profile?.positioning) && (
-                            <div className="space-y-3 border-t border-gray-50 pt-4">
-                              {result.profile.target_audience && (
-                                <div>
-                                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Who they target</p>
-                                  <p className="text-sm text-gray-700 leading-relaxed">{result.profile.target_audience}</p>
-                                </div>
-                              )}
-                              {result.profile.positioning && (
-                                <div>
-                                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Their positioning</p>
-                                  <p className="text-sm text-gray-700 leading-relaxed">{result.profile.positioning}</p>
-                                </div>
-                              )}
-                              {result.profile.strategy && (
-                                <div>
-                                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Strategy signals</p>
-                                  <p className="text-sm text-gray-700 leading-relaxed">{result.profile.strategy}</p>
-                                </div>
-                              )}
-                              {result.profile.opportunities && (
-                                <div className="rounded-xl bg-amber-50 border border-amber-100 p-3.5">
-                                  <p className="text-xs font-semibold uppercase tracking-widest text-amber-700 mb-1">Opportunities for you</p>
-                                  <p className="text-sm text-amber-800 leading-relaxed">{result.profile.opportunities}</p>
-                                </div>
+                          {/* 30-day changes */}
+                          <div className="border-t border-gray-50 pt-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Changes (30d)</p>
+                              {result.waybackDate && (
+                                <span className="text-xs text-gray-300">vs. {new Date(result.waybackDate.replace(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/, "$1-$2-$3T$4:$5:$6")).toLocaleDateString()}</span>
                               )}
                             </div>
-                          )}
-
-                          {/* 30-day changes */}
-                          <div className="space-y-2 border-t border-gray-50 pt-4">
-                            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-                              Last 30 days
-                              {result.waybackDate && (
-                                <span className="ml-2 normal-case font-normal text-gray-300">
-                                  vs. {new Date(result.waybackDate.replace(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/, "$1-$2-$3T$4:$5:$6")).toLocaleDateString()}
-                                </span>
-                              )}
-                            </p>
-                            {result.waybackError === "no_archive" && (
-                              <p className="text-sm text-gray-400">No public archive found — changes tracked from today.</p>
-                            )}
-                            {result.waybackError === "scrape_failed" && (
-                              <p className="text-sm text-gray-400">Archive exists but site blocks automated access — changes tracked from today.</p>
+                            {(result.waybackError || (!result.waybackDate && !result.waybackChanges?.length)) && (
+                              <p className="text-xs text-gray-400">No archive available — tracking from today.</p>
                             )}
                             {result.waybackDate && (result.waybackChanges?.length ?? 0) === 0 && (
-                              <p className="text-sm text-gray-400">Page has been stable over the last 30 days.</p>
+                              <p className="text-xs text-gray-400">Stable — no changes detected in 30 days.</p>
                             )}
                             {(result.waybackChanges?.length ?? 0) > 0 && (
-                              <div className="space-y-2">
+                              <div className="space-y-1.5">
                                 {result.waybackChanges!.map((change, i) => {
                                   const cfg = changeLabels[change.type];
                                   return (
-                                    <div key={i} className={`rounded-xl border p-3 ${cfg.bg}`}>
-                                      <div className="flex items-start gap-2">
-                                        <span className="text-sm">{cfg.icon}</span>
-                                        <div className="space-y-0.5">
-                                          <p className={`text-sm font-medium ${cfg.text}`}>{cfg.label(change)}</p>
-                                          {change.type === "headline" && (
-                                            <div className="text-xs space-y-0.5">
-                                              <p className="text-gray-400 line-through">{change.from}</p>
-                                              <p className="text-gray-700 font-medium">{change.to}</p>
-                                            </div>
-                                          )}
-                                        </div>
+                                    <div key={i} className={`rounded-lg border px-3 py-2 flex items-start gap-2 ${cfg.bg}`}>
+                                      <span className="text-xs mt-0.5">{cfg.icon}</span>
+                                      <div>
+                                        <p className={`text-xs font-medium ${cfg.text}`}>{cfg.label(change)}</p>
+                                        {change.type === "headline" && (
+                                          <p className="text-xs text-gray-400 mt-0.5"><span className="line-through">{change.from}</span> → <span className="font-medium text-gray-700">{change.to}</span></p>
+                                        )}
                                       </div>
                                     </div>
                                   );
                                 })}
                                 {result.waybackInsight && (
-                                  <div className="rounded-xl border border-amber-100 bg-amber-50 p-3 flex items-start gap-2">
-                                    <span className="text-sm">🧠</span>
-                                    <p className="text-sm text-amber-800">{result.waybackInsight}</p>
-                                  </div>
+                                  <p className="text-xs text-amber-700 italic pt-0.5">{result.waybackInsight}</p>
                                 )}
                               </div>
                             )}
                           </div>
 
-                          {/* Page details */}
+                          {/* Page snapshot — compact */}
                           {result.snapshot?.headline && (
-                            <div className="space-y-3 border-t border-gray-50 pt-4">
-                              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Page details</p>
-                              <p className="text-sm text-gray-800 font-medium">"{result.snapshot.headline}"</p>
-                              {result.snapshot.ctas.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5">
-                                  {result.snapshot.ctas.slice(0, 8).map((cta, i) => (
-                                    <span key={i} className="text-xs bg-gray-50 border border-gray-200 text-gray-600 px-2.5 py-1 rounded-full">{cta}</span>
-                                  ))}
-                                </div>
-                              )}
-                              <div className="flex gap-2 flex-wrap">
-                                <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${result.snapshot.has_social_proof ? "bg-green-50 border-green-100 text-green-700" : "bg-gray-50 border-gray-200 text-gray-400"}`}>
-                                  {result.snapshot.has_social_proof ? "✓ Social proof" : "✗ No social proof"}
+                            <div className="border-t border-gray-50 pt-3 space-y-2">
+                              <p className="text-xs text-gray-500 font-medium italic">"{result.snapshot.headline}"</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {result.snapshot.ctas.slice(0, 6).map((cta, i) => (
+                                  <span key={i} className="text-xs bg-gray-50 border border-gray-200 text-gray-500 px-2 py-0.5 rounded-full">{cta}</span>
+                                ))}
+                                <span className={`text-xs px-2 py-0.5 rounded-full border ${result.snapshot.has_social_proof ? "bg-green-50 border-green-100 text-green-700" : "bg-gray-50 border-gray-200 text-gray-400"}`}>
+                                  {result.snapshot.has_social_proof ? "✓ social proof" : "✗ social proof"}
                                 </span>
-                                <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${result.snapshot.has_pricing ? "bg-green-50 border-green-100 text-green-700" : "bg-gray-50 border-gray-200 text-gray-400"}`}>
-                                  {result.snapshot.has_pricing ? "✓ Pricing" : "✗ No pricing"}
+                                <span className={`text-xs px-2 py-0.5 rounded-full border ${result.snapshot.has_pricing ? "bg-green-50 border-green-100 text-green-700" : "bg-gray-50 border-gray-200 text-gray-400"}`}>
+                                  {result.snapshot.has_pricing ? "✓ pricing" : "✗ pricing"}
                                 </span>
                               </div>
                               {result.snapshot.client_list?.length > 0 && (
-                                <div>
-                                  <p className="text-xs text-gray-400 mb-1.5">Known clients</p>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {result.snapshot.client_list.map((client, i) => (
-                                      <span key={i} className="text-xs bg-indigo-50 border border-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full font-medium">{client}</span>
-                                    ))}
-                                  </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {result.snapshot.client_list.map((client, i) => (
+                                    <span key={i} className="text-xs bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">{client}</span>
+                                  ))}
                                 </div>
                               )}
                             </div>

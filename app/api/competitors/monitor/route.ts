@@ -129,23 +129,22 @@ async function generateCompetitiveProfile(hostname: string, snapshot: Competitor
     model: "gpt-4o-mini",
     messages: [{
       role: "user",
-      content: `You are a senior B2B marketing strategist doing competitive intelligence on ${hostname}.
+      content: `You are a B2B marketing strategist. Analyse ${hostname}'s landing page and return sharp, one-sentence insights. No filler, no "they are", no "this company".
 
-Landing page data:
+Data:
 - Headline: "${snapshot.headline}"
 - Subheadline: "${snapshot.subheadline}"
 - CTAs: ${JSON.stringify(snapshot.ctas.slice(0, 5))}
-- Page sections: ${JSON.stringify(snapshot.sections.slice(0, 8))}
-- Has social proof: ${snapshot.has_social_proof}
-- Has pricing: ${snapshot.has_pricing}
-- Known clients: ${JSON.stringify(snapshot.client_list?.slice(0, 10) ?? [])}
+- Sections: ${JSON.stringify(snapshot.sections.slice(0, 8))}
+- Social proof: ${snapshot.has_social_proof}, Pricing: ${snapshot.has_pricing}
+- Clients: ${JSON.stringify(snapshot.client_list?.slice(0, 8) ?? [])}
 
 Return ONLY this JSON (no markdown):
 {
-  "target_audience": "1-2 sentences: who specifically are they targeting? Job title, company size, industry, pain point.",
-  "positioning": "1-2 sentences: what is their unique angle or claim? How do they differentiate?",
-  "strategy": "2-3 sentences: what does this page tell us about their go-to-market? Are they going upmarket/downmarket? Feature-led or outcome-led? Any notable bets?",
-  "opportunities": "2-3 sentences: where are the gaps in their positioning that a competitor could exploit? What are they NOT saying that someone else could own?"
+  "target_audience": "Max 15 words. Who exactly. e.g. 'Enterprise compliance teams at crypto-native financial institutions.'",
+  "positioning": "Max 15 words. Their unique angle. e.g. 'The only audit-ready blockchain analytics built for regulated industries.'",
+  "strategy": "Max 20 words. One key strategic signal from the page. e.g. 'Going upmarket via enterprise logos and compliance framing — abandoning self-serve.'",
+  "opportunities": "Max 25 words. The gap a competitor could own. e.g. 'No mention of ROI or time-to-value — an easy wedge for a challenger with a faster onboarding story.'"
 }`,
     }],
     max_tokens: 400,
