@@ -196,7 +196,7 @@ export default function Home() {
         {isSignedIn ? (
           <UserButton />
         ) : (
-          <SignInButton mode="modal">
+          <SignInButton mode="modal" forceRedirectUrl="/dashboard">
             <button className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
               Sign in
             </button>

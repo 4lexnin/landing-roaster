@@ -3,11 +3,9 @@
 import { useState, useEffect } from "react";
 import { useUser, UserButton } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { ScoreBar } from "@/components/ScoreBar";
 import { ScoreRing } from "@/components/ScoreRing";
-import { ComparisonCard } from "@/components/ComparisonCard";
-import { RoastResult, ComparisonResult } from "@/lib/types";
+import { RoastResult } from "@/lib/types";
 import { Change, CompetitorSnapshot } from "@/lib/changeDetector";
 
 type View = "intel" | "analyses" | "new";
@@ -85,9 +83,6 @@ export default function Dashboard() {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<RoastResult | null>(null);
   const [analysisError, setAnalysisError] = useState("");
-  const [newComparison, setNewComparison] = useState<ComparisonResult | null>(null);
-  const [newComparing, setNewComparing] = useState(false);
-  const [newCompareError, setNewCompareError] = useState("");
 
   // Market Intel state
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
@@ -229,8 +224,8 @@ export default function Dashboard() {
     setAnalysisLoading(true);
     setAnalysisError("");
     setAnalysisResult(null);
-    setNewComparison(null);
-    setNewCompareError("");
+    
+   
     try {
       const res = await fetch("/api/roast", {
         method: "POST",
@@ -254,25 +249,6 @@ export default function Dashboard() {
     }
   }
 
-  async function runNewComparison() {
-    if (!analysisResult || !user) return;
-    setNewComparing(true);
-    setNewCompareError("");
-    try {
-      const res = await fetch("/api/compare", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, scraped: analysisResult.scraped, yourScore: analysisResult.score.total_score }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Something went wrong");
-      setNewComparison(data);
-    } catch (err) {
-      setNewCompareError(err instanceof Error ? err.message : "Failed");
-    } finally {
-      setNewComparing(false);
-    }
-  }
 
   if (!isLoaded) {
     return (
@@ -291,10 +267,10 @@ export default function Dashboard() {
       {/* Sidebar */}
       <aside className="w-52 shrink-0 border-r border-gray-100 flex flex-col h-screen sticky top-0">
         <div className="px-5 py-5">
-          <Link href="/" className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <span className="text-lg">🍞</span>
             <span className="text-sm font-semibold text-gray-900">Roaster</span>
-          </Link>
+          </div>
         </div>
 
         <nav className="flex-1 px-3 space-y-0.5">
@@ -315,7 +291,7 @@ export default function Dashboard() {
             </button>
           ))}
           <button
-            onClick={() => { setView("new"); setAnalysisResult(null); setAnalysisUrl(""); setAnalysisError(""); setNewComparison(null); }}
+            onClick={() => { setView("new"); setAnalysisResult(null); setAnalysisUrl(""); setAnalysisError("");  }}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors text-left ${
               view === "new"
                 ? "bg-gray-100 text-gray-900 font-medium"
@@ -413,7 +389,7 @@ export default function Dashboard() {
                         <p className="text-sm text-gray-400">Analyse your page first — we'll suggest competitors to track automatically.</p>
                       </div>
                       <button
-                        onClick={() => { setView("new"); setAnalysisResult(null); setAnalysisUrl(""); setAnalysisError(""); setNewComparison(null); }}
+                        onClick={() => { setView("new"); setAnalysisResult(null); setAnalysisUrl(""); setAnalysisError("");  }}
                         className={BTN + " mx-auto"}
                         style={BTN_COLOR}
                       >
@@ -699,7 +675,7 @@ export default function Dashboard() {
                   <p className="text-sm text-gray-400 mt-0.5">{roasts.length} page{roasts.length !== 1 ? "s" : ""} analysed</p>
                 </div>
                 <button
-                  onClick={() => { setView("new"); setAnalysisResult(null); setAnalysisUrl(""); setAnalysisError(""); setNewComparison(null); }}
+                  onClick={() => { setView("new"); setAnalysisResult(null); setAnalysisUrl(""); setAnalysisError("");  }}
                   className={BTN}
                   style={BTN_COLOR}
                 >
@@ -716,7 +692,7 @@ export default function Dashboard() {
                   <p className="text-sm font-medium text-gray-700 mb-1">No analyses yet</p>
                   <p className="text-sm text-gray-400 mb-6">Analyse your first landing page to get a full breakdown.</p>
                   <button
-                    onClick={() => { setView("new"); setAnalysisResult(null); setAnalysisUrl(""); setAnalysisError(""); setNewComparison(null); }}
+                    onClick={() => { setView("new"); setAnalysisResult(null); setAnalysisUrl(""); setAnalysisError("");  }}
                     className={BTN + " mx-auto"}
                     style={BTN_COLOR}
                   >
@@ -861,29 +837,19 @@ export default function Dashboard() {
                     </ul>
                   </div>
 
-                  <div className="border border-gray-100 rounded-xl p-6 space-y-4">
+                  <div className="border border-gray-100 rounded-xl p-6 space-y-3">
                     <p className="text-xs text-gray-400 uppercase tracking-widest">Competitor analysis</p>
-                    {newComparison ? (
-                      <ComparisonCard yourScore={analysisResult.score} comparison={newComparison} />
-                    ) : (
-                      <div className="space-y-2">
-                        {newCompareError && <p className="text-xs text-red-500">{newCompareError}</p>}
-                        <button
-                          onClick={runNewComparison}
-                          disabled={newComparing}
-                          className={BTN}
-                          style={BTN_COLOR}
-                        >
-                          {newComparing ? (
-                            <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Finding competitors...</>
-                          ) : "Run competitor analysis"}
-                        </button>
-                      </div>
-                    )}
+                    <button
+                      onClick={() => { setView("intel"); setAnalysisResult(null); setAnalysisUrl(""); }}
+                      className={BTN}
+                      style={BTN_COLOR}
+                    >
+                      View competitor intel →
+                    </button>
                   </div>
 
                   <button
-                    onClick={() => { setAnalysisResult(null); setAnalysisUrl(""); setNewComparison(null); setNewCompareError(""); }}
+                    onClick={() => { setAnalysisResult(null); setAnalysisUrl("");  }}
                     className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
                   >
                     ← Analyse another page
