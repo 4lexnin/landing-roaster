@@ -95,25 +95,45 @@ async function scrapeWithClients(url: string): Promise<CompetitorSnapshot> {
   return { ...base, client_list };
 }
 
-async function getWaybackSnapshot(url: string): Promise<{ snapshot: CompetitorSnapshot; date: string } | null> {
+type WaybackResult =
+  | { status: "ok"; snapshot: CompetitorSnapshot; date: string }
+  | { status: "no_archive" }
+  | { status: "scrape_failed" };
+
+async function getWaybackSnapshot(url: string): Promise<WaybackResult> {
+  // Step 1: find an archive URL (fast metadata lookup)
+  let archiveUrl: string | null = null;
+  let archiveDate: string | null = null;
+
   for (const daysBack of [30, 60, 90]) {
     try {
       const pastDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
       const timestamp = pastDate.toISOString().replace(/\D/g, "").slice(0, 14);
       const availRes = await fetch(
         `https://archive.org/wayback/available?url=${encodeURIComponent(url)}&timestamp=${timestamp}`,
-        { signal: AbortSignal.timeout(6000) }
+        { signal: AbortSignal.timeout(8000) }
       );
       const availData = await availRes.json();
       const closest = availData?.archived_snapshots?.closest;
-      if (!closest?.available || !closest?.url) continue;
-      const snapshot = await scrapeWithClients(closest.url);
-      return { snapshot, date: closest.timestamp };
+      if (closest?.available && closest?.url) {
+        archiveUrl = closest.url;
+        archiveDate = closest.timestamp;
+        break;
+      }
     } catch {
       continue;
     }
   }
-  return null;
+
+  if (!archiveUrl || !archiveDate) return { status: "no_archive" };
+
+  // Step 2: scrape the archived page — separate error from "no archive"
+  try {
+    const snapshot = await scrapeWithClients(archiveUrl);
+    return { status: "ok", snapshot, date: archiveDate };
+  } catch {
+    return { status: "scrape_failed" };
+  }
 }
 
 function formatChangesForAI(changes: Change[]): string {
@@ -228,17 +248,13 @@ export async function POST(req: NextRequest) {
         let waybackInsight: string | undefined;
         let waybackError: "no_archive" | "scrape_failed" | undefined;
 
-        try {
-          const wayback = await getWaybackSnapshot(competitor.url);
-          if (wayback) {
-            waybackDate = wayback.date;
-            waybackChanges = detectChanges(wayback.snapshot, current);
-            if (waybackChanges.length > 0) waybackInsight = await generateInsight(competitor.hostname, waybackChanges);
-          } else {
-            waybackError = "no_archive";
-          }
-        } catch {
-          waybackError = "scrape_failed";
+        const wayback = await getWaybackSnapshot(competitor.url);
+        if (wayback.status === "ok") {
+          waybackDate = wayback.date;
+          waybackChanges = detectChanges(wayback.snapshot, current);
+          if (waybackChanges.length > 0) waybackInsight = await generateInsight(competitor.hostname, waybackChanges);
+        } else {
+          waybackError = wayback.status;
         }
 
         // Incremental diff since last scan
