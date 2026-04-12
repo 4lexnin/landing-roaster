@@ -108,12 +108,16 @@ ${context}`,
   }
 }
 
-async function scrapeWithClients(url: string): Promise<CompetitorSnapshot> {
+async function scrapeWithClients(url: string, filterTerms: string[] = []): Promise<CompetitorSnapshot> {
   const html = await fetchHtml(url);
-  const [base, client_list] = await Promise.all([
+  const [base, rawClients] = await Promise.all([
     Promise.resolve(parseSnapshot(html)),
     extractClients(html),
   ]);
+  // Remove the competitor's own brand/hostname from the client list
+  const client_list = rawClients.filter(c =>
+    !filterTerms.some(t => c.toLowerCase().includes(t.toLowerCase()))
+  );
   return { ...base, client_list };
 }
 
@@ -161,44 +165,6 @@ Return ONLY this JSON (no markdown):
   }
 }
 
-type WaybackResult =
-  | { status: "ok"; snapshot: CompetitorSnapshot; date: string }
-  | { status: "no_archive" }
-  | { status: "scrape_failed" };
-
-async function getWaybackSnapshot(url: string): Promise<WaybackResult> {
-  let archiveUrl: string | null = null;
-  let archiveDate: string | null = null;
-
-  for (const daysBack of [30, 60, 90]) {
-    try {
-      const pastDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
-      const timestamp = pastDate.toISOString().replace(/\D/g, "").slice(0, 14);
-      const availRes = await fetch(
-        `https://archive.org/wayback/available?url=${encodeURIComponent(url)}&timestamp=${timestamp}`,
-        { signal: AbortSignal.timeout(8000) }
-      );
-      const availData = await availRes.json();
-      const closest = availData?.archived_snapshots?.closest;
-      if (closest?.available && closest?.url) {
-        archiveUrl = closest.url;
-        archiveDate = closest.timestamp;
-        break;
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  if (!archiveUrl || !archiveDate) return { status: "no_archive" };
-
-  try {
-    const snapshot = await scrapeWithClients(archiveUrl);
-    return { status: "ok", snapshot, date: archiveDate };
-  } catch {
-    return { status: "scrape_failed" };
-  }
-}
 
 function formatChangesForAI(changes: Change[]): string {
   return changes.map(c => {
@@ -236,10 +202,6 @@ export interface MonitorResult {
   snapshot: CompetitorSnapshot;
   score: HeuristicResult;
   profile: CompetitiveProfile;
-  waybackDate?: string;
-  waybackChanges?: Change[];
-  waybackInsight?: string;
-  waybackError?: "no_archive" | "scrape_failed";
   changes: Change[];
   aiInsight?: string;
   error?: string;
@@ -257,7 +219,9 @@ export async function POST(req: NextRequest) {
   await Promise.allSettled(
     competitors.map(async (competitor) => {
       try {
-        const current = await scrapeWithClients(competitor.url);
+        // Pass hostname parts as filter terms to exclude from client list
+        const hostParts = competitor.hostname.replace("www.", "").split(".").filter((p: string) => p.length > 2);
+        const current = await scrapeWithClients(competitor.url, hostParts);
 
         const [scoreResult, profileResult, lastSnapshotResult] = await Promise.allSettled([
           Promise.resolve(computeScore({
@@ -273,7 +237,7 @@ export async function POST(req: NextRequest) {
           supabaseAdmin.from("competitor_snapshots").select("*").eq("competitor_id", competitor.id).order("created_at", { ascending: false }).limit(1).single(),
         ]);
 
-        const score = scoreResult.status === "fulfilled" ? scoreResult.value : { total_score: 0, breakdown: { clarity: 0, value: 0, structure: 0, conversion: 0, trust: 0 }, flags: [] };
+        const score = scoreResult.status === "fulfilled" ? scoreResult.value : { total_score: 0, breakdown: { clarity: 0, value: 0, structure: 0, conversion: 0, trust: 0 }, flags: [], breakdown_flags: { clarity: [], value: [], structure: [], conversion: [], trust: [] } };
         const profile = profileResult.status === "fulfilled" ? profileResult.value : { target_audience: "", positioning: "", strategy: "", opportunities: "" };
         const lastSnapshot = lastSnapshotResult.status === "fulfilled" ? lastSnapshotResult.value.data : null;
 
@@ -287,21 +251,6 @@ export async function POST(req: NextRequest) {
           nav_links: current.nav_links,
           client_list: current.client_list,
         });
-
-        // Wayback — always try
-        let waybackDate: string | undefined;
-        let waybackChanges: Change[] | undefined;
-        let waybackInsight: string | undefined;
-        let waybackError: "no_archive" | "scrape_failed" | undefined;
-
-        const wayback = await getWaybackSnapshot(competitor.url);
-        if (wayback.status === "ok") {
-          waybackDate = wayback.date;
-          waybackChanges = detectChanges(wayback.snapshot, current);
-          if (waybackChanges.length > 0) waybackInsight = await generateInsight(competitor.hostname, waybackChanges);
-        } else {
-          waybackError = wayback.status;
-        }
 
         // Incremental diff since last scan
         const isFirstRun = !lastSnapshot;
@@ -337,12 +286,12 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        results.push({ competitorId: competitor.id, hostname: competitor.hostname, url: competitor.url, isFirstRun, snapshot: current, score, profile, waybackDate, waybackChanges, waybackInsight, waybackError, changes, aiInsight });
+        results.push({ competitorId: competitor.id, hostname: competitor.hostname, url: competitor.url, isFirstRun, snapshot: current, score, profile, changes, aiInsight });
       } catch (err) {
         results.push({
           competitorId: competitor.id, hostname: competitor.hostname, url: competitor.url, isFirstRun: false,
           snapshot: { headline: "", subheadline: "", ctas: [], sections: [], has_social_proof: false, has_pricing: false, nav_links: [], word_count: 0, client_list: [] },
-          score: { total_score: 0, breakdown: { clarity: 0, value: 0, structure: 0, conversion: 0, trust: 0 }, flags: [] },
+          score: { total_score: 0, breakdown: { clarity: 0, value: 0, structure: 0, conversion: 0, trust: 0 }, flags: [], breakdown_flags: { clarity: [], value: [], structure: [], conversion: [], trust: [] } },
           profile: { target_audience: "", positioning: "", strategy: "", opportunities: "" },
           changes: [],
           error: err instanceof Error ? err.message : "Failed to scrape",

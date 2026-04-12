@@ -20,6 +20,7 @@ export interface HeuristicResult {
   total_score: number;
   breakdown: ScoreBreakdown;
   flags: string[];
+  breakdown_flags: Record<keyof ScoreBreakdown, string[]>;
 }
 
 export interface LLMResult {

@@ -189,5 +189,13 @@ export function computeScore(data: ScrapedData): HeuristicResult {
     ...trust.flags,
   ].slice(0, 6);
 
-  return { total_score, breakdown, flags: allFlags };
+  const breakdown_flags = {
+    clarity: clarity.flags,
+    value: value.flags,
+    structure: structure.flags,
+    conversion: conversion.flags,
+    trust: trust.flags,
+  };
+
+  return { total_score, breakdown, flags: allFlags, breakdown_flags };
 }
