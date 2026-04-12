@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useUser, SignInButton, UserButton } from "@clerk/nextjs";
 import { RoastResults } from "@/components/RoastResults";
-import { SharePopup } from "@/components/SharePopup";
 import { RoastResult } from "@/lib/types";
 
 type State = "idle" | "loading" | "done" | "error";
@@ -63,7 +62,31 @@ export default function Home() {
 
   useEffect(() => {
     fetchRoastCount().then(setRoastCount);
+    // Restore result after Clerk OAuth redirect
+    const saved = sessionStorage.getItem("pendingRoastResult");
+    if (saved) {
+      try {
+        setResult(JSON.parse(saved));
+        setState("done");
+        sessionStorage.removeItem("pendingRoastResult");
+      } catch { /* ignore */ }
+    }
   }, []);
+
+  // Auto-trigger Stripe checkout after sign-in if user clicked "Unlock" before signing in
+  useEffect(() => {
+    if (!isSignedIn || !user) return;
+    const pending = sessionStorage.getItem("pendingCheckout");
+    if (!pending) return;
+    sessionStorage.removeItem("pendingCheckout");
+    fetch("/api/stripe/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id, userEmail: user.primaryEmailAddress?.emailAddress }),
+    })
+      .then(r => r.json())
+      .then(({ url: checkoutUrl }) => { if (checkoutUrl) window.location.href = checkoutUrl; });
+  }, [isSignedIn, user]);
 
   useEffect(() => {
     if (tab === "leaderboard" && leaderboard.length === 0) {
@@ -112,6 +135,7 @@ export default function Home() {
 
       setResult(data);
       setState("done");
+      sessionStorage.setItem("pendingRoastResult", JSON.stringify(data));
       // Refresh leaderboard data on next open
       setLeaderboard([]);
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
@@ -291,10 +315,10 @@ export default function Home() {
               setState("idle");
               setResult(null);
               setUrl("");
+              sessionStorage.removeItem("pendingRoastResult");
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
           />
-          <SharePopup result={result} />
         </div>
       )}
     </main>

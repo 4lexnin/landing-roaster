@@ -157,7 +157,11 @@ export function RoastResults({ result, onRoastAnother }: Props) {
           <p className="text-xs text-green-600 font-medium">✓ You have Pro access — competitor comparison coming next.</p>
         ) : !isSignedIn ? (
           <SignInButton mode="modal">
-            <button className="w-full text-sm font-medium py-2.5 rounded-xl text-white transition-colors" style={{ backgroundColor: "#92400e" }}>
+            <button
+              className="w-full text-sm font-medium py-2.5 rounded-xl text-white transition-colors"
+              style={{ backgroundColor: "#92400e" }}
+              onClick={() => sessionStorage.setItem("pendingCheckout", "1")}
+            >
               Sign in to unlock
             </button>
           </SignInButton>
