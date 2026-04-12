@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdminAdmin } from "@/lib/supabaseAdmin";
 
 export async function GET(req: NextRequest) {
   const userId = req.nextUrl.searchParams.get("userId");
   if (!userId) return NextResponse.json({ active: false });
 
-  const { data } = await supabase
+  const { data } = await supabaseAdmin
     .from("subscriptions")
     .select("status")
     .eq("user_id", userId)

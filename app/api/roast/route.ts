@@ -5,7 +5,7 @@ import { computeScore } from "@/lib/scoring";
 import { ScrapedData, RoastResult } from "@/lib/types";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { getCached, setCache } from "@/lib/cache";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
 
     // Save to Supabase if user is logged in (fire and forget)
     if (userId) {
-      supabase.from("roasts").insert({
+      supabaseAdmin.from("roasts").insert({
         user_id: userId,
         url: normalizedUrl,
         hostname: new URL(normalizedUrl).hostname,
