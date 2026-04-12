@@ -462,7 +462,15 @@ export default function Dashboard() {
                           onClick={() => setExpandedCard(isOpen ? null : competitor.id)}
                         >
                           <div className="flex-1 min-w-0">
-                            <span className="text-sm font-medium text-gray-900">{competitor.hostname}</span>
+                            <a
+                              href={competitor.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              className="text-sm font-medium text-gray-900 hover:underline"
+                            >
+                              {competitor.hostname}
+                            </a>
                           </div>
                           {result && !result.error && result.score.total_score > 0 && (
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-md tabular-nums ${scoreLabel(result.score.total_score)}`}>
