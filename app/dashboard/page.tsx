@@ -109,6 +109,7 @@ export default function Dashboard() {
     return localStorage.getItem("lastChecked");
   });
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const [showFullProfile, setShowFullProfile] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -456,97 +457,127 @@ export default function Dashboard() {
                         </button>
 
                         {/* Expanded content */}
-                        {isOpen && result && !result.error && (
-                          <div className="px-5 pb-5 pt-1 border-t border-gray-50 space-y-5">
+                        {isOpen && result && !result.error && (() => {
+                          const weakSignals = Object.values(result.score.breakdown_flags ?? {}).flat().slice(0, 4);
+                          const profileOpen = showFullProfile[competitor.id];
+                          return (
+                            <div className="px-5 pb-5 pt-4 border-t border-gray-50 space-y-5">
 
-                            {/* Signals row */}
-                            <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-500">
-                              <span>{result.snapshot.has_pricing ? "✓ Pricing" : "✗ Pricing"}</span>
-                              <span>{result.snapshot.has_social_proof ? "✓ Social proof" : "✗ Social proof"}</span>
-                              {result.snapshot.ctas.length > 0 && <span>{result.snapshot.ctas.length} CTA{result.snapshot.ctas.length !== 1 ? "s" : ""}</span>}
-                              {result.snapshot.nav_links.length > 0 && <span>{result.snapshot.nav_links.length} pages</span>}
-                            </div>
+                              {/* Hero: opportunity */}
+                              {result.profile.opportunities && (
+                                <div className="border-l-2 border-amber-400 bg-amber-50 rounded-r-lg px-4 py-3">
+                                  <p className="text-[11px] font-semibold text-amber-600 uppercase tracking-wider mb-1">Your opening</p>
+                                  <p className="text-sm text-gray-900 leading-relaxed">{result.profile.opportunities}</p>
+                                </div>
+                              )}
 
-                            {/* Headline */}
-                            {result.snapshot.headline && (
+                              {/* Weak signals */}
+                              {weakSignals.length > 0 && (
+                                <div>
+                                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Their weak spots</p>
+                                  <ul className="space-y-1">
+                                    {weakSignals.map((flag, i) => (
+                                      <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                                        <span className="text-gray-300 mt-0.5 shrink-0">·</span>
+                                        {flag}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {/* Changes feed */}
                               <div>
-                                <p className="text-xs text-gray-400 mb-1">Headline</p>
-                                <p className="text-sm text-gray-700">"{result.snapshot.headline}"</p>
-                              </div>
-                            )}
-
-                            {/* Profile */}
-                            {(result.profile.target_audience || result.profile.positioning) && (
-                              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                                {result.profile.target_audience && (
-                                  <div>
-                                    <p className="text-xs text-gray-400 mb-0.5">Target</p>
-                                    <p className="text-sm text-gray-700">{result.profile.target_audience}</p>
+                                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Changes</p>
+                                {result.changes.length > 0 ? (
+                                  <div className="space-y-3">
+                                    <ul className="space-y-1">
+                                      {result.changes.map((c, i) => (
+                                        <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                                          <span className="text-gray-300 mt-0.5 shrink-0">·</span>
+                                          <span>
+                                            {changeText(c)}
+                                            {c.type === "headline" && c.from && (
+                                              <span className="text-gray-400 ml-1.5 text-xs">"{c.from}" → "{c.to}"</span>
+                                            )}
+                                          </span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                    {result.aiInsight && (
+                                      <div className="bg-gray-50 rounded-lg px-3.5 py-3">
+                                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">What this means</p>
+                                        <p className="text-sm text-gray-700">{result.aiInsight}</p>
+                                      </div>
+                                    )}
                                   </div>
-                                )}
-                                {result.profile.positioning && (
-                                  <div>
-                                    <p className="text-xs text-gray-400 mb-0.5">Positioning</p>
-                                    <p className="text-sm text-gray-700">{result.profile.positioning}</p>
-                                  </div>
-                                )}
-                                {result.profile.strategy && (
-                                  <div className="col-span-2">
-                                    <p className="text-xs text-gray-400 mb-0.5">Strategy signal</p>
-                                    <p className="text-sm text-gray-700">{result.profile.strategy}</p>
-                                  </div>
+                                ) : (
+                                  <p className="text-sm text-gray-400">
+                                    {result.isFirstRun
+                                      ? "Tracking started — changes will surface here as they happen"
+                                      : "Stable — no major changes since last scan"}
+                                  </p>
                                 )}
                               </div>
-                            )}
 
-                            {/* Opportunity */}
-                            {result.profile.opportunities && (
-                              <div className="bg-amber-50 rounded-lg px-4 py-3 text-sm text-amber-800">
-                                <span className="font-medium">Opportunity — </span>{result.profile.opportunities}
-                              </div>
-                            )}
-
-                            {/* Changes */}
-                            <div>
-                              <p className="text-xs text-gray-400 mb-2">Changes</p>
-                              {result.changes.length > 0 ? (
-                                <div className="space-y-1.5">
-                                  {result.changes.map((c, i) => (
-                                    <div key={i} className="text-sm text-gray-700">
-                                      <span className="text-gray-400 mr-1.5">·</span>
-                                      {changeText(c)}
-                                      {c.type === "headline" && c.from && (
-                                        <span className="text-gray-400 ml-1 text-xs">"{c.from}" → "{c.to}"</span>
+                              {/* Full profile toggle */}
+                              <div className="border-t border-gray-50 pt-3">
+                                <button
+                                  onClick={() => setShowFullProfile(prev => ({ ...prev, [competitor.id]: !prev[competitor.id] }))}
+                                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                                >
+                                  {profileOpen ? "▲ Hide full profile" : "▼ Show full profile"}
+                                </button>
+                                {profileOpen && (
+                                  <div className="mt-4 space-y-4">
+                                    <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                                      {result.profile.target_audience && (
+                                        <div>
+                                          <p className="text-[11px] text-gray-400 uppercase tracking-wider mb-0.5">Target</p>
+                                          <p className="text-sm text-gray-700">{result.profile.target_audience}</p>
+                                        </div>
+                                      )}
+                                      {result.profile.positioning && (
+                                        <div>
+                                          <p className="text-[11px] text-gray-400 uppercase tracking-wider mb-0.5">Positioning</p>
+                                          <p className="text-sm text-gray-700">{result.profile.positioning}</p>
+                                        </div>
+                                      )}
+                                      {result.profile.strategy && (
+                                        <div className="col-span-2">
+                                          <p className="text-[11px] text-gray-400 uppercase tracking-wider mb-0.5">Strategy signal</p>
+                                          <p className="text-sm text-gray-700">{result.profile.strategy}</p>
+                                        </div>
                                       )}
                                     </div>
-                                  ))}
-                                  {result.aiInsight && (
-                                    <p className="text-xs text-gray-500 italic pt-1">{result.aiInsight}</p>
-                                  )}
-                                </div>
-                              ) : (
-                                <p className="text-sm text-gray-400">
-                                  {result.isFirstRun
-                                    ? "Baseline captured — changes will appear here on the next scan"
-                                    : "No changes detected"}
-                                </p>
-                              )}
-                            </div>
-
-                            {/* Clients */}
-                            {result.snapshot.client_list && result.snapshot.client_list.length > 0 && (
-                              <div>
-                                <p className="text-xs text-gray-400 mb-2">Known clients</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {result.snapshot.client_list.map((client, i) => (
-                                    <span key={i} className="text-xs bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">{client}</span>
-                                  ))}
-                                </div>
+                                    {result.snapshot.headline && (
+                                      <div>
+                                        <p className="text-[11px] text-gray-400 uppercase tracking-wider mb-0.5">Current headline</p>
+                                        <p className="text-sm text-gray-600 italic">"{result.snapshot.headline}"</p>
+                                      </div>
+                                    )}
+                                    <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-500">
+                                      <span>{result.snapshot.has_pricing ? "✓ Pricing visible" : "✗ No pricing"}</span>
+                                      <span>{result.snapshot.has_social_proof ? "✓ Social proof" : "✗ No social proof"}</span>
+                                      {result.snapshot.ctas.length > 0 && <span>{result.snapshot.ctas.length} CTA{result.snapshot.ctas.length !== 1 ? "s" : ""}</span>}
+                                    </div>
+                                    {result.snapshot.client_list && result.snapshot.client_list.length > 0 && (
+                                      <div>
+                                        <p className="text-[11px] text-gray-400 uppercase tracking-wider mb-2">Known clients</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {result.snapshot.client_list.map((client, i) => (
+                                            <span key={i} className="text-xs bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">{client}</span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                            )}
 
-                          </div>
-                        )}
+                            </div>
+                          );
+                        })()}
 
                         {/* Error state */}
                         {isOpen && result?.error && (

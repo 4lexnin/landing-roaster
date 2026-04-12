@@ -186,7 +186,7 @@ async function generateInsight(hostname: string, changes: Change[]): Promise<str
     model: "gpt-4o-mini",
     messages: [{
       role: "user",
-      content: `Competitive analyst: ${hostname} made these landing page changes:\n\n${formatChangesForAI(changes)}\n\nIn 1-2 sentences, what does this signal about their strategy? Be direct.`,
+      content: `Competitive analyst: ${hostname} just made these landing page changes:\n\n${formatChangesForAI(changes)}\n\nIn 1-2 sentences: what does this signal about their strategy, and what should their competitors do about it? Be direct and actionable.`,
     }],
     max_tokens: 120,
     temperature: 0.7,
