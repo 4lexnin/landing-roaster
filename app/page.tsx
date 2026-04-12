@@ -184,7 +184,15 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#fafafa] font-sans">
       {/* Nav */}
-      <div className="fixed top-0 right-0 p-4 z-50">
+      <div className="fixed top-0 right-0 p-4 z-50 flex items-center gap-3">
+        {isSignedIn && isPro && (
+          <a
+            href="/dashboard"
+            className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors"
+          >
+            Dashboard
+          </a>
+        )}
         {isSignedIn ? (
           <UserButton />
         ) : (

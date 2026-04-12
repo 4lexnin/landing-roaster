@@ -34,3 +34,20 @@ export interface RoastResult {
   score: HeuristicResult;
   llm: LLMResult;
 }
+
+export interface CompetitorEntry {
+  url: string;
+  hostname: string;
+  score: HeuristicResult;
+}
+
+export interface CompetitorInsight {
+  label: string;
+  verdict: "winning" | "losing" | "tied";
+  detail: string;
+}
+
+export interface ComparisonResult {
+  competitors: CompetitorEntry[];
+  insights: CompetitorInsight[];
+}

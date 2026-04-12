@@ -128,8 +128,8 @@ export function RoastResults({ result, isPro, proActivating, onRoastAnother }: P
       </div>
 
 
-      {/* Share */}
-      <ShareBar result={result} />
+      {/* Share — hidden for Pro users */}
+      {!isPro && <ShareBar result={result} />}
 
       {/* Competitor comparison paywall */}
       <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
@@ -153,7 +153,13 @@ export function RoastResults({ result, isPro, proActivating, onRoastAnother }: P
             Activating Pro access...
           </div>
         ) : isPro ? (
-          <p className="text-xs text-green-600 font-medium">✓ Pro access active — competitor comparison coming next.</p>
+          <a
+            href="/dashboard"
+            className="w-full text-sm font-medium py-2.5 rounded-xl text-white transition-colors flex items-center justify-center gap-2"
+            style={{ backgroundColor: "#92400e" }}
+          >
+            Open in dashboard →
+          </a>
         ) : !isSignedIn ? (
           <SignInButton mode="modal">
             <button
