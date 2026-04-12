@@ -35,7 +35,7 @@ interface MonitorResult {
   isFirstRun: boolean;
   snapshot: CompetitorSnapshot;
   score: { total_score: number; breakdown: Record<string, number>; flags: string[]; breakdown_flags: Record<string, string[]> };
-  profile: { target_audience: string; positioning: string; strategy: string; opportunities: string; gaps: string[] };
+  profile: { target_audience: string; positioning: string; move: string; opportunities: string; gaps: string[]; implication: string };
   changes: Change[];
   aiInsight?: string;
   error?: string;
@@ -527,6 +527,14 @@ export default function Dashboard() {
                                 </div>
                               )}
 
+                              {/* What this means */}
+                              {result.profile.implication && (
+                                <div className="bg-gray-50 rounded-lg px-4 py-3">
+                                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">What this means</p>
+                                  <p className="text-sm text-gray-700">{result.profile.implication}</p>
+                                </div>
+                              )}
+
                               {/* Changes feed */}
                               <div>
                                 <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Changes</p>
@@ -584,10 +592,10 @@ export default function Dashboard() {
                                           <p className="text-sm text-gray-700">{result.profile.positioning}</p>
                                         </div>
                                       )}
-                                      {result.profile.strategy && (
+                                      {result.profile.move && (
                                         <div className="col-span-2">
-                                          <p className="text-[11px] text-gray-400 uppercase tracking-wider mb-0.5">Strategy signal</p>
-                                          <p className="text-sm text-gray-700">{result.profile.strategy}</p>
+                                          <p className="text-[11px] text-gray-400 uppercase tracking-wider mb-0.5">Their move</p>
+                                          <p className="text-sm text-gray-700">{result.profile.move}</p>
                                         </div>
                                       )}
                                     </div>
