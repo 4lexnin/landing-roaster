@@ -1,13 +1,17 @@
 export interface CompetitorSnapshot {
   headline: string;
+  subheadline: string;
   ctas: string[];
+  sections: string[];
   has_social_proof: boolean;
   has_pricing: boolean;
   nav_links: string[];
+  word_count: number;
+  client_list: string[];
 }
 
 export interface Change {
-  type: "headline" | "cta_added" | "cta_removed" | "social_proof" | "pricing" | "nav_added" | "nav_removed";
+  type: "headline" | "cta_added" | "cta_removed" | "social_proof" | "pricing" | "nav_added" | "nav_removed" | "client_added" | "client_removed";
   from?: string;
   to?: string;
   value?: string;
@@ -45,6 +49,15 @@ export function detectChanges(prev: CompetitorSnapshot, curr: CompetitorSnapshot
   }
   for (const link of prev.nav_links ?? []) {
     if (!currNav.has(link)) changes.push({ type: "nav_removed", value: link });
+  }
+
+  const prevClients = new Set(prev.client_list ?? []);
+  const currClients = new Set(curr.client_list ?? []);
+  for (const client of curr.client_list ?? []) {
+    if (!prevClients.has(client)) changes.push({ type: "client_added", value: client });
+  }
+  for (const client of prev.client_list ?? []) {
+    if (!currClients.has(client)) changes.push({ type: "client_removed", value: client });
   }
 
   return changes;
