@@ -33,19 +33,24 @@ export function ComparisonCard({ yourScore, comparison }: Props) {
   return (
     <div className="space-y-6">
       {/* Comparison table */}
-      <div className="overflow-x-auto -mx-1">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm table-fixed">
+          <colgroup>
+            <col className="w-28" />
+            <col />
+            {competitors.map((c) => <col key={c.hostname} />)}
+          </colgroup>
           <thead>
             <tr className="border-b border-gray-100">
-              <th className="text-left py-2 pr-3 text-xs font-semibold uppercase tracking-widest text-gray-400 w-24">
+              <th className="text-left py-2 pr-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
                 Category
               </th>
-              <th className="text-center py-2 px-2 text-xs font-semibold text-amber-700 bg-amber-50 rounded-t-md min-w-14">
+              <th className="text-center py-2 px-3 text-xs font-semibold text-amber-700 bg-amber-50 rounded-t-md">
                 You
               </th>
               {competitors.map((c) => (
-                <th key={c.hostname} className="text-center py-2 px-2 text-xs font-medium text-gray-400 min-w-20">
-                  <span className="block truncate max-w-20">{c.hostname.replace("www.", "")}</span>
+                <th key={c.hostname} className="text-center py-2 px-3 text-xs font-medium text-gray-400">
+                  <span className="block truncate">{c.hostname.replace("www.", "")}</span>
                 </th>
               ))}
             </tr>
@@ -58,13 +63,13 @@ export function ComparisonCard({ yourScore, comparison }: Props) {
               return (
                 <tr key={key} className="border-b border-gray-50">
                   <td className="py-2.5 pr-3 text-xs text-gray-500">{label}</td>
-                  <td className={`text-center py-2.5 px-2 tabular-nums text-sm ${cellStyle(yourVal, best)}`}>
+                  <td className={`text-center py-2.5 px-3 tabular-nums text-sm bg-amber-50/40 ${cellStyle(yourVal, best)}`}>
                     {yourVal}
                   </td>
                   {competitors.map((c) => {
                     const val = c.score.breakdown[key];
                     return (
-                      <td key={c.hostname} className={`text-center py-2.5 px-2 tabular-nums text-sm ${cellStyle(val, best)}`}>
+                      <td key={c.hostname} className={`text-center py-2.5 px-3 tabular-nums text-sm ${cellStyle(val, best)}`}>
                         {val}
                       </td>
                     );
@@ -79,11 +84,11 @@ export function ComparisonCard({ yourScore, comparison }: Props) {
                 const best = Math.max(...allTotals);
                 return (
                   <>
-                    <td className={`text-center py-3 px-2 tabular-nums text-sm font-bold ${cellStyle(yourScore.total_score, best)}`}>
+                    <td className={`text-center py-3 px-3 tabular-nums text-sm font-bold bg-amber-50/40 ${cellStyle(yourScore.total_score, best)}`}>
                       {yourScore.total_score}
                     </td>
                     {competitors.map((c) => (
-                      <td key={c.hostname} className={`text-center py-3 px-2 tabular-nums text-sm font-bold ${cellStyle(c.score.total_score, best)}`}>
+                      <td key={c.hostname} className={`text-center py-3 px-3 tabular-nums text-sm font-bold ${cellStyle(c.score.total_score, best)}`}>
                         {c.score.total_score}
                       </td>
                     ))}

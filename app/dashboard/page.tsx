@@ -8,7 +8,7 @@ import { ScoreBar } from "@/components/ScoreBar";
 import { ScoreRing } from "@/components/ScoreRing";
 import { ComparisonCard } from "@/components/ComparisonCard";
 import { RoastResult, ComparisonResult } from "@/lib/types";
-import { Change } from "@/lib/changeDetector";
+import { Change, CompetitorSnapshot } from "@/lib/changeDetector";
 
 type View = "analyses" | "intel" | "leaderboard" | "new";
 
@@ -33,7 +33,10 @@ interface MonitorResult {
   hostname: string;
   url: string;
   isFirstRun: boolean;
+  snapshot: CompetitorSnapshot;
   waybackDate?: string;
+  waybackChanges?: Change[];
+  waybackInsight?: string;
   changes: Change[];
   aiInsight?: string;
   error?: string;
@@ -548,61 +551,94 @@ export default function Dashboard() {
                     <div key={result.competitorId} className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-semibold text-gray-900">{result.hostname}</p>
-                        {result.isFirstRun && result.changes.length > 0 ? (
-                          <span className="text-xs bg-amber-50 text-amber-700 border border-amber-100 px-2.5 py-1 rounded-full font-medium">{result.changes.length} change{result.changes.length !== 1 ? "s" : ""} (last 30d)</span>
-                        ) : result.isFirstRun ? (
-                          <span className="text-xs bg-blue-50 text-blue-700 border border-blue-100 px-2.5 py-1 rounded-full font-medium">Baseline saved</span>
-                        ) : result.error ? (
+                        {result.error ? (
                           <span className="text-xs bg-red-50 text-red-600 border border-red-100 px-2.5 py-1 rounded-full font-medium">Failed to scan</span>
-                        ) : result.changes.length === 0 ? (
-                          <span className="text-xs bg-gray-50 text-gray-500 border border-gray-200 px-2.5 py-1 rounded-full font-medium">No changes</span>
+                        ) : (result.waybackChanges?.length ?? 0) > 0 ? (
+                          <span className="text-xs bg-amber-50 text-amber-700 border border-amber-100 px-2.5 py-1 rounded-full font-medium">{result.waybackChanges!.length} change{result.waybackChanges!.length !== 1 ? "s" : ""} in 30d</span>
+                        ) : result.waybackDate ? (
+                          <span className="text-xs bg-gray-50 text-gray-500 border border-gray-200 px-2.5 py-1 rounded-full font-medium">No changes in 30d</span>
                         ) : (
-                          <span className="text-xs bg-amber-50 text-amber-700 border border-amber-100 px-2.5 py-1 rounded-full font-medium">{result.changes.length} change{result.changes.length !== 1 ? "s" : ""}</span>
+                          <span className="text-xs bg-gray-50 text-gray-500 border border-gray-200 px-2.5 py-1 rounded-full font-medium">No archive found</span>
                         )}
                       </div>
 
-                      {result.isFirstRun && !result.waybackDate && (
-                        <p className="text-sm text-gray-500">Baseline saved. Run monitoring again to detect future changes.</p>
-                      )}
-
-                      {result.isFirstRun && result.waybackDate && result.changes.length === 0 && (
-                        <p className="text-sm text-gray-500">Compared against a 30-day-old snapshot — no changes found.</p>
-                      )}
-
                       {result.error && <p className="text-sm text-red-500">{result.error}</p>}
 
-                      {result.changes.length > 0 && (
-                        <div className="space-y-2">
-                          {result.isFirstRun && result.waybackDate && (
-                            <p className="text-xs text-gray-400 mb-1">
-                              Changes detected vs. snapshot from {new Date(
-                                result.waybackDate.replace(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/, "$1-$2-$3T$4:$5:$6")
-                              ).toLocaleDateString()}
-                            </p>
-                          )}
-                          {result.changes.map((change, i) => {
-                            const cfg = changeLabels[change.type];
-                            return (
-                              <div key={i} className={`rounded-xl border p-3.5 ${cfg.bg}`}>
-                                <div className="flex items-start gap-2">
-                                  <span className="text-sm">{cfg.icon}</span>
-                                  <div className="space-y-1">
-                                    <p className={`text-sm font-medium ${cfg.text}`}>{cfg.label(change)}</p>
-                                    {change.type === "headline" && (
-                                      <div className="text-xs space-y-0.5">
-                                        <p className="text-gray-400 line-through">{change.from}</p>
-                                        <p className="text-gray-700 font-medium">{change.to}</p>
+                      {!result.error && (
+                        <div className="space-y-4">
+                          {/* 30-day changes — primary value */}
+                          {result.waybackDate && (
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                                Last 30 days
+                                <span className="ml-2 normal-case font-normal text-gray-300">
+                                  vs. {new Date(result.waybackDate.replace(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/, "$1-$2-$3T$4:$5:$6")).toLocaleDateString()}
+                                </span>
+                              </p>
+                              {(result.waybackChanges?.length ?? 0) === 0 ? (
+                                <p className="text-sm text-gray-400">No changes detected in the last 30 days.</p>
+                              ) : (
+                                <>
+                                  {result.waybackChanges!.map((change, i) => {
+                                    const cfg = changeLabels[change.type];
+                                    return (
+                                      <div key={i} className={`rounded-xl border p-3.5 ${cfg.bg}`}>
+                                        <div className="flex items-start gap-2">
+                                          <span className="text-sm">{cfg.icon}</span>
+                                          <div className="space-y-1">
+                                            <p className={`text-sm font-medium ${cfg.text}`}>{cfg.label(change)}</p>
+                                            {change.type === "headline" && (
+                                              <div className="text-xs space-y-0.5">
+                                                <p className="text-gray-400 line-through">{change.from}</p>
+                                                <p className="text-gray-700 font-medium">{change.to}</p>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
                                       </div>
-                                    )}
+                                    );
+                                  })}
+                                  {result.waybackInsight && (
+                                    <div className="rounded-xl border border-amber-100 bg-amber-50 p-3.5 flex items-start gap-2">
+                                      <span className="text-sm">🧠</span>
+                                      <p className="text-sm text-amber-800">{result.waybackInsight}</p>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          )}
+
+                          {!result.waybackDate && (
+                            <p className="text-sm text-gray-400">No archive found for this site — changes will be tracked from now on.</p>
+                          )}
+
+                          {/* Current snapshot */}
+                          {result.snapshot?.headline && (
+                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
+                              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 pt-1">Current state</p>
+                              <div>
+                                <p className="text-xs text-gray-400 mb-0.5">Headline</p>
+                                <p className="text-sm text-gray-700 font-medium">{result.snapshot.headline}</p>
+                              </div>
+                              {result.snapshot.ctas.length > 0 && (
+                                <div>
+                                  <p className="text-xs text-gray-400 mb-1">CTAs</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {result.snapshot.ctas.slice(0, 6).map((cta, i) => (
+                                      <span key={i} className="text-xs bg-gray-50 border border-gray-200 text-gray-600 px-2 py-0.5 rounded-full">{cta}</span>
+                                    ))}
                                   </div>
                                 </div>
+                              )}
+                              <div className="flex gap-2">
+                                <span className={`text-xs px-2 py-0.5 rounded-full border ${result.snapshot.has_social_proof ? "bg-green-50 border-green-100 text-green-700" : "bg-gray-50 border-gray-200 text-gray-400"}`}>
+                                  {result.snapshot.has_social_proof ? "✓ Social proof" : "✗ No social proof"}
+                                </span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full border ${result.snapshot.has_pricing ? "bg-green-50 border-green-100 text-green-700" : "bg-gray-50 border-gray-200 text-gray-400"}`}>
+                                  {result.snapshot.has_pricing ? "✓ Pricing" : "✗ No pricing"}
+                                </span>
                               </div>
-                            );
-                          })}
-                          {result.aiInsight && (
-                            <div className="rounded-xl border border-amber-100 bg-amber-50 p-3.5 flex items-start gap-2">
-                              <span className="text-sm">🧠</span>
-                              <p className="text-sm text-amber-800">{result.aiInsight}</p>
                             </div>
                           )}
                         </div>

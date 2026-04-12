@@ -39,13 +39,7 @@ async function scrape(url: string): Promise<CompetitorSnapshot> {
     }
   });
 
-  return {
-    headline,
-    ctas,
-    has_social_proof,
-    has_pricing,
-    nav_links: [...navLinks].slice(0, 20),
-  };
+  return { headline, ctas, has_social_proof, has_pricing, nav_links: [...navLinks].slice(0, 20) };
 }
 
 async function getWaybackSnapshot(url: string): Promise<{ snapshot: CompetitorSnapshot; date: string } | null> {
@@ -96,10 +90,14 @@ export interface MonitorResult {
   hostname: string;
   url: string;
   isFirstRun: boolean;
+  snapshot: CompetitorSnapshot;
+  // 30-day Wayback comparison — always attempted
   waybackDate?: string;
+  waybackChanges?: Change[];
+  waybackInsight?: string;
+  // Incremental changes since last scan (saved to DB history)
   changes: Change[];
   aiInsight?: string;
-  snapshot: CompetitorSnapshot;
   error?: string;
 }
 
@@ -121,7 +119,7 @@ export async function POST(req: NextRequest) {
       try {
         const current = await scrape(competitor.url);
 
-        // Get last snapshot
+        // Get last snapshot for incremental diff
         const { data: lastSnapshot } = await supabaseAdmin
           .from("competitor_snapshots")
           .select("*")
@@ -141,75 +139,74 @@ export async function POST(req: NextRequest) {
           nav_links: current.nav_links,
         });
 
-        if (!lastSnapshot) {
-          // First run — try Wayback Machine for immediate value
-          let waybackDate: string | undefined;
-          let changes: Change[] = [];
-          let aiInsight: string | undefined;
+        // Always try 30-day Wayback comparison
+        let waybackDate: string | undefined;
+        let waybackChanges: Change[] | undefined;
+        let waybackInsight: string | undefined;
 
-          try {
-            const wayback = await getWaybackSnapshot(competitor.url);
-            if (wayback) {
-              waybackDate = wayback.date;
-              changes = detectChanges(wayback.snapshot, current);
-              if (changes.length > 0) {
-                aiInsight = await generateInsight(competitor.hostname, changes);
-                await supabaseAdmin.from("competitor_changes").insert(
-                  changes.map((c) => ({
-                    competitor_id: competitor.id,
-                    user_id: userId,
-                    change_type: c.type,
-                    from_value: c.from ?? null,
-                    to_value: c.to ?? null,
-                    value: c.value ?? null,
-                    added: c.added ?? null,
-                  }))
-                );
-              }
+        try {
+          const wayback = await getWaybackSnapshot(competitor.url);
+          if (wayback) {
+            waybackDate = wayback.date;
+            waybackChanges = detectChanges(wayback.snapshot, current);
+            if (waybackChanges.length > 0) {
+              waybackInsight = await generateInsight(competitor.hostname, waybackChanges);
             }
-          } catch {
-            // Wayback unavailable — fall through with empty changes
           }
-
-          results.push({ competitorId: competitor.id, hostname: competitor.hostname, url: competitor.url, isFirstRun: true, waybackDate, changes, aiInsight, snapshot: current });
-          return;
+        } catch {
+          // Wayback unavailable — silent fallback
         }
 
-        const prev: CompetitorSnapshot = {
-          headline: lastSnapshot.headline ?? "",
-          ctas: lastSnapshot.ctas ?? [],
-          has_social_proof: lastSnapshot.has_social_proof ?? false,
-          has_pricing: lastSnapshot.has_pricing ?? false,
-          nav_links: lastSnapshot.nav_links ?? [],
-        };
-
-        const changes = detectChanges(prev, current);
+        // Incremental diff since last scan
+        const isFirstRun = !lastSnapshot;
+        let changes: Change[] = [];
         let aiInsight: string | undefined;
 
-        if (changes.length > 0) {
-          aiInsight = await generateInsight(competitor.hostname, changes);
-          await supabaseAdmin.from("competitor_changes").insert(
-            changes.map((c) => ({
-              competitor_id: competitor.id,
-              user_id: userId,
-              change_type: c.type,
-              from_value: c.from ?? null,
-              to_value: c.to ?? null,
-              value: c.value ?? null,
-              added: c.added ?? null,
-            }))
-          );
+        if (lastSnapshot) {
+          const prev: CompetitorSnapshot = {
+            headline: lastSnapshot.headline ?? "",
+            ctas: lastSnapshot.ctas ?? [],
+            has_social_proof: lastSnapshot.has_social_proof ?? false,
+            has_pricing: lastSnapshot.has_pricing ?? false,
+            nav_links: lastSnapshot.nav_links ?? [],
+          };
+          changes = detectChanges(prev, current);
+          if (changes.length > 0) {
+            aiInsight = await generateInsight(competitor.hostname, changes);
+            await supabaseAdmin.from("competitor_changes").insert(
+              changes.map((c) => ({
+                competitor_id: competitor.id,
+                user_id: userId,
+                change_type: c.type,
+                from_value: c.from ?? null,
+                to_value: c.to ?? null,
+                value: c.value ?? null,
+                added: c.added ?? null,
+              }))
+            );
+          }
         }
 
-        results.push({ competitorId: competitor.id, hostname: competitor.hostname, url: competitor.url, isFirstRun: false, changes, aiInsight, snapshot: current });
+        results.push({
+          competitorId: competitor.id,
+          hostname: competitor.hostname,
+          url: competitor.url,
+          isFirstRun,
+          snapshot: current,
+          waybackDate,
+          waybackChanges,
+          waybackInsight,
+          changes,
+          aiInsight,
+        });
       } catch (err) {
         results.push({
           competitorId: competitor.id,
           hostname: competitor.hostname,
           url: competitor.url,
           isFirstRun: false,
-          changes: [],
           snapshot: { headline: "", ctas: [], has_social_proof: false, has_pricing: false, nav_links: [] },
+          changes: [],
           error: err instanceof Error ? err.message : "Failed to scrape",
         });
       }
