@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useUser, SignInButton, UserButton } from "@clerk/nextjs";
 import { RoastResults } from "@/components/RoastResults";
 import { SharePopup } from "@/components/SharePopup";
 import { RoastResult } from "@/lib/types";
@@ -47,6 +48,7 @@ function scoreColor(score: number) {
 }
 
 export default function Home() {
+  const { isSignedIn, user } = useUser();
   const [tab, setTab] = useState<Tab>("roast");
   const [url, setUrl] = useState("");
   const [state, setState] = useState<State>("idle");
@@ -99,7 +101,7 @@ export default function Home() {
       const res = await fetch("/api/roast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ url: url.trim(), userId: user?.id ?? null }),
       });
 
       const data = await res.json();
@@ -121,6 +123,19 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#fafafa] font-sans">
+      {/* Nav */}
+      <div className="fixed top-0 right-0 p-4 z-50">
+        {isSignedIn ? (
+          <UserButton />
+        ) : (
+          <SignInButton mode="modal">
+            <button className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
+              Sign in
+            </button>
+          </SignInButton>
+        )}
+      </div>
+
       {/* Hero / Input */}
       <section className="flex flex-col items-center justify-center px-4 pt-24 pb-16">
         <div className="w-full max-w-2xl space-y-10">

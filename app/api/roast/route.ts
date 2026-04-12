@@ -5,6 +5,7 @@ import { computeScore } from "@/lib/scoring";
 import { ScrapedData, RoastResult } from "@/lib/types";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { getCached, setCache } from "@/lib/cache";
+import { supabase } from "@/lib/supabase";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -123,7 +124,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { url } = await req.json();
+    const { url, userId } = await req.json();
     if (!url || typeof url !== "string") {
       return NextResponse.json({ error: "URL is required" }, { status: 400 });
     }
@@ -149,6 +150,17 @@ export async function POST(req: NextRequest) {
     };
 
     setCache(normalizedUrl, result);
+
+    // Save to Supabase if user is logged in (fire and forget)
+    if (userId) {
+      supabase.from("roasts").insert({
+        user_id: userId,
+        url: normalizedUrl,
+        hostname: new URL(normalizedUrl).hostname,
+        score: result.score.total_score,
+        result,
+      }).then(() => {});
+    }
 
     // Increment roast counter + update leaderboard (fire and forget)
     import("@upstash/redis").then(({ Redis }) => {

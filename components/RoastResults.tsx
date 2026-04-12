@@ -4,6 +4,8 @@ import { RoastResult } from "@/lib/types";
 import { ScoreRing } from "./ScoreRing";
 import { ScoreBar } from "./ScoreBar";
 import { ShareBar } from "./ShareBar";
+import { useUser, SignInButton } from "@clerk/nextjs";
+import { useEffect, useState } from "react";
 
 interface Props {
   result: RoastResult;
@@ -20,6 +22,10 @@ const categoryMeta = {
 
 export function RoastResults({ result, onRoastAnother }: Props) {
   const { url, score, llm } = result;
+  const { isSignedIn, user } = useUser();
+  const [isPro, setIsPro] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+
   const hostname = (() => {
     try {
       return new URL(url).hostname;
@@ -27,6 +33,29 @@ export function RoastResults({ result, onRoastAnother }: Props) {
       return url;
     }
   })();
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetch(`/api/subscription?userId=${user.id}`)
+      .then(r => r.json())
+      .then(d => setIsPro(d.active));
+  }, [user?.id]);
+
+  async function handleUpgrade() {
+    if (!isSignedIn) return;
+    setUpgrading(true);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, userEmail: user.primaryEmailAddress?.emailAddress }),
+      });
+      const { url: checkoutUrl } = await res.json();
+      if (checkoutUrl) window.location.href = checkoutUrl;
+    } finally {
+      setUpgrading(false);
+    }
+  }
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6 pb-16">
@@ -108,32 +137,47 @@ export function RoastResults({ result, onRoastAnother }: Props) {
       {/* Share */}
       <ShareBar result={result} />
 
-      {/* Teaser */}
-      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 space-y-3 opacity-80">
-        <div className="flex items-center gap-2">
-          <span className="text-base">🔒</span>
-          <h2 className="text-sm font-semibold text-gray-700">
-            Compare your page to competitors
-          </h2>
-          <span className="ml-auto text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
-            Coming soon
-          </span>
+      {/* Competitor comparison paywall */}
+      <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h2 className="text-sm font-semibold text-gray-900">Compare to competitors</h2>
+            <p className="text-xs text-gray-400">
+              See how your page stacks up against your top 3 competitors — full breakdown + action items.
+            </p>
+          </div>
+          {!isPro && (
+            <span className="flex-shrink-0 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-full">
+              Pro · €5/mo
+            </span>
+          )}
         </div>
-        <p className="text-xs text-gray-400">
-          See how your landing page stacks up against your top 3 competitors — side by side.
-        </p>
-        <input
-          disabled
-          placeholder="Add a competitor URL..."
-          className="w-full text-sm border border-gray-100 rounded-lg px-3 py-2 bg-gray-50 text-gray-400 cursor-not-allowed"
-        />
+
+        {isPro ? (
+          <p className="text-xs text-green-600 font-medium">✓ You have Pro access — competitor comparison coming next.</p>
+        ) : !isSignedIn ? (
+          <SignInButton mode="modal">
+            <button className="w-full text-sm font-medium py-2.5 rounded-xl text-white transition-colors" style={{ backgroundColor: "#92400e" }}>
+              Sign in to unlock
+            </button>
+          </SignInButton>
+        ) : (
+          <button
+            onClick={handleUpgrade}
+            disabled={upgrading}
+            className="w-full text-sm font-medium py-2.5 rounded-xl text-white transition-colors disabled:opacity-50"
+            style={{ backgroundColor: "#92400e" }}
+          >
+            {upgrading ? "Redirecting to checkout..." : "Unlock for €5/month"}
+          </button>
+        )}
       </div>
 
       {/* Roast another */}
       <div className="flex justify-center">
         <button
           onClick={onRoastAnother}
-          className="text-white text-sm font-medium px-6 py-3 rounded-xl transition-colors" style={{ backgroundColor: "#b45309" }}
+          className="text-white text-sm font-medium px-6 py-3 rounded-xl transition-colors" style={{ backgroundColor: "#92400e" }}
         >
           Roast another page
         </button>
