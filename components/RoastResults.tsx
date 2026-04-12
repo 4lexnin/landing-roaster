@@ -5,12 +5,9 @@ import { ScoreRing } from "./ScoreRing";
 import { ScoreBar } from "./ScoreBar";
 import { ShareBar } from "./ShareBar";
 import { useUser, SignInButton } from "@clerk/nextjs";
-import { useState } from "react";
 
 interface Props {
   result: RoastResult;
-  isPro: boolean;
-  proActivating: boolean;
   onRoastAnother: () => void;
 }
 
@@ -22,10 +19,9 @@ const categoryMeta = {
   trust: { label: "Trust", description: "Any proof or credibility?" },
 };
 
-export function RoastResults({ result, isPro, proActivating, onRoastAnother }: Props) {
+export function RoastResults({ result, onRoastAnother }: Props) {
   const { url, score, llm } = result;
-  const { isSignedIn, user } = useUser();
-  const [upgrading, setUpgrading] = useState(false);
+  const { isSignedIn } = useUser();
 
   const hostname = (() => {
     try {
@@ -34,22 +30,6 @@ export function RoastResults({ result, isPro, proActivating, onRoastAnother }: P
       return url;
     }
   })();
-
-  async function handleUpgrade() {
-    if (!isSignedIn) return;
-    setUpgrading(true);
-    try {
-      const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, userEmail: user.primaryEmailAddress?.emailAddress }),
-      });
-      const { url: checkoutUrl } = await res.json();
-      if (checkoutUrl) window.location.href = checkoutUrl;
-    } finally {
-      setUpgrading(false);
-    }
-  }
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6 pb-16">
@@ -128,57 +108,34 @@ export function RoastResults({ result, isPro, proActivating, onRoastAnother }: P
       </div>
 
 
-      {/* Share — hidden for Pro users */}
-      {!isPro && <ShareBar result={result} />}
+      <ShareBar result={result} />
 
-      {/* Competitor comparison paywall */}
+      {/* Dashboard CTA */}
       <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <h2 className="text-sm font-semibold text-gray-900">Compare to competitors</h2>
-            <p className="text-xs text-gray-400">
-              See how your page stacks up against your top 3 competitors — full breakdown + action items.
-            </p>
-          </div>
-          {!isPro && (
-            <span className="flex-shrink-0 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-full">
-              Pro · €5/mo
-            </span>
-          )}
+        <div className="space-y-1">
+          <h2 className="text-sm font-semibold text-gray-900">Track your competitors</h2>
+          <p className="text-xs text-gray-400">
+            See how your page stacks up, track competitor changes, and get weekly intel — free.
+          </p>
         </div>
 
-        {proActivating ? (
-          <div className="flex items-center gap-2 text-xs text-amber-700">
-            <span className="w-3.5 h-3.5 border-2 border-amber-300 border-t-amber-700 rounded-full animate-spin" />
-            Activating Pro access...
-          </div>
-        ) : isPro ? (
+        {isSignedIn ? (
           <a
             href="/dashboard"
             className="w-full text-sm font-medium py-2.5 rounded-xl text-white transition-colors flex items-center justify-center gap-2"
             style={{ backgroundColor: "#92400e" }}
           >
-            Open in dashboard →
+            Open dashboard →
           </a>
-        ) : !isSignedIn ? (
-          <SignInButton mode="modal">
+        ) : (
+          <SignInButton mode="modal" forceRedirectUrl="/dashboard">
             <button
               className="w-full text-sm font-medium py-2.5 rounded-xl text-white transition-colors"
               style={{ backgroundColor: "#92400e" }}
-              onClick={() => sessionStorage.setItem("pendingCheckout", "1")}
             >
-              Sign in to unlock
+              Sign in with Google — it's free
             </button>
           </SignInButton>
-        ) : (
-          <button
-            onClick={handleUpgrade}
-            disabled={upgrading}
-            className="w-full text-sm font-medium py-2.5 rounded-xl text-white transition-colors disabled:opacity-50"
-            style={{ backgroundColor: "#92400e" }}
-          >
-            {upgrading ? "Redirecting to checkout..." : "Unlock for €5/month"}
-          </button>
         )}
       </div>
 

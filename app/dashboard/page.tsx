@@ -73,8 +73,6 @@ function changeText(c: Change): string {
 export default function Dashboard() {
   const { isSignedIn, isLoaded, user } = useUser();
   const router = useRouter();
-  const [isPro, setIsPro] = useState(false);
-  const [proLoaded, setProLoaded] = useState(false);
   const [view, setView] = useState<View>("intel");
 
   // Analyses state
@@ -110,21 +108,15 @@ export default function Dashboard() {
   });
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [showFullProfile, setShowFullProfile] = useState<Record<string, boolean>>({});
+  const [suggestingCompetitors, setSuggestingCompetitors] = useState(false);
 
   useEffect(() => {
     if (!isLoaded) return;
-    if (!isSignedIn) { router.push("/"); return; }
-    fetch(`/api/subscription?userId=${user.id}`)
-      .then(r => r.json())
-      .then(d => {
-        setIsPro(d.active);
-        setProLoaded(true);
-        if (!d.active) router.push("/");
-      });
-  }, [isLoaded, isSignedIn, user, router]);
+    if (!isSignedIn) router.push("/");
+  }, [isLoaded, isSignedIn, router]);
 
   useEffect(() => {
-    if (!isPro || !user) return;
+    if (!isSignedIn || !user) return;
     setRoastsLoading(true);
     fetch(`/api/roasts?userId=${user.id}`)
       .then(r => r.json())
@@ -134,15 +126,15 @@ export default function Dashboard() {
         if (r.length > 0) setExpanded(r[0].id);
         setRoastsLoading(false);
       });
-  }, [isPro, user]);
+  }, [isSignedIn, user]);
 
   useEffect(() => {
-    if (!isPro || !user) return;
+    if (!isSignedIn || !user) return;
     setCompetitorsLoading(true);
     fetch(`/api/competitors?userId=${user.id}`)
       .then(r => r.json())
       .then(d => { setCompetitors(d.competitors ?? []); setCompetitorsLoading(false); });
-  }, [isPro, user]);
+  }, [isSignedIn, user]);
 
   async function addCompetitor() {
     if (!newCompetitorUrl.trim() || !user) return;
@@ -174,6 +166,39 @@ export default function Dashboard() {
       try { localStorage.setItem("monitorResults", JSON.stringify(next)); } catch {}
       return next;
     });
+  }
+
+  async function suggestCompetitors() {
+    if (!user || roasts.length === 0) return;
+    setSuggestingCompetitors(true);
+    try {
+      const latestRoast = roasts[0];
+      const res = await fetch("/api/compare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, scraped: latestRoast.result.scraped, yourScore: latestRoast.score }),
+      });
+      const data = await res.json();
+      const found: Competitor[] = [];
+      for (const c of (data.competitors ?? []).slice(0, 3)) {
+        const addRes = await fetch("/api/competitors", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user.id, url: c.url }),
+        });
+        if (addRes.ok) {
+          const added = await addRes.json();
+          found.push(added.competitor);
+        }
+      }
+      if (found.length > 0) {
+        const updated = [...competitors, ...found];
+        setCompetitors(updated);
+        await runMonitoring(updated);
+      }
+    } finally {
+      setSuggestingCompetitors(false);
+    }
   }
 
   async function runMonitoring(competitorList?: Competitor[]) {
@@ -271,7 +296,7 @@ export default function Dashboard() {
     }
   }
 
-  if (!isLoaded || !proLoaded) {
+  if (!isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <span className="w-5 h-5 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin" />
@@ -327,7 +352,6 @@ export default function Dashboard() {
           <UserButton />
           <div className="min-w-0">
             <p className="text-xs font-medium text-gray-800 truncate">{user?.firstName ?? user?.primaryEmailAddress?.emailAddress}</p>
-            <span className="text-[11px] text-amber-700 font-semibold">Pro</span>
           </div>
         </div>
       </aside>
@@ -384,9 +408,25 @@ export default function Dashboard() {
 
               {/* Empty state */}
               {!competitorsLoading && competitors.length === 0 && (
-                <div className="border border-dashed border-gray-200 rounded-xl p-10 text-center">
-                  <p className="text-sm font-medium text-gray-700 mb-1">No competitors yet</p>
-                  <p className="text-sm text-gray-400">Add a competitor URL above — we'll scan their page and track every change from there.</p>
+                <div className="border border-dashed border-gray-200 rounded-xl p-10 text-center space-y-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-1">No competitors yet</p>
+                    <p className="text-sm text-gray-400">Add a URL above, or let us find your competitors automatically.</p>
+                  </div>
+                  {roasts.length > 0 && (
+                    <button
+                      onClick={suggestCompetitors}
+                      disabled={suggestingCompetitors}
+                      className={BTN + " mx-auto"}
+                      style={BTN_COLOR}
+                    >
+                      {suggestingCompetitors ? (
+                        <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Finding competitors for {roasts[0].hostname}...</>
+                      ) : (
+                        `Find competitors for ${roasts[0].hostname}`
+                      )}
+                    </button>
+                  )}
                 </div>
               )}
 
