@@ -35,7 +35,7 @@ interface MonitorResult {
   isFirstRun: boolean;
   snapshot: CompetitorSnapshot;
   score: { total_score: number; breakdown: Record<string, number> };
-  positioning: string;
+  profile: { target_audience: string; positioning: string; strategy: string; opportunities: string };
   waybackDate?: string;
   waybackChanges?: Change[];
   waybackInsight?: string;
@@ -588,28 +588,51 @@ export default function Dashboard() {
                       {!result.error && (
                         <div className="space-y-5">
 
-                          {/* Positioning */}
-                          {result.positioning && (
-                            <p className="text-sm text-gray-600 leading-relaxed">{result.positioning}</p>
-                          )}
-
-                          {/* Score breakdown */}
+                          {/* Score bar */}
                           {result.score.total_score > 0 && (
-                            <div className="grid grid-cols-5 gap-2">
+                            <div className="grid grid-cols-5 gap-2 pb-1">
                               {(["clarity", "value", "structure", "conversion", "trust"] as const).map(key => (
                                 <div key={key} className="text-center">
-                                  <p className={`text-sm font-bold tabular-nums ${scoreColor(result.score.breakdown[key])}`}>
-                                    {result.score.breakdown[key]}
-                                  </p>
+                                  <p className={`text-sm font-bold tabular-nums ${scoreColor(result.score.breakdown[key])}`}>{result.score.breakdown[key]}</p>
                                   <p className="text-xs text-gray-400 mt-0.5 capitalize">{key}</p>
                                 </div>
                               ))}
                             </div>
                           )}
 
+                          {/* Competitive profile */}
+                          {(result.profile?.target_audience || result.profile?.positioning) && (
+                            <div className="space-y-3 border-t border-gray-50 pt-4">
+                              {result.profile.target_audience && (
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Who they target</p>
+                                  <p className="text-sm text-gray-700 leading-relaxed">{result.profile.target_audience}</p>
+                                </div>
+                              )}
+                              {result.profile.positioning && (
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Their positioning</p>
+                                  <p className="text-sm text-gray-700 leading-relaxed">{result.profile.positioning}</p>
+                                </div>
+                              )}
+                              {result.profile.strategy && (
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Strategy signals</p>
+                                  <p className="text-sm text-gray-700 leading-relaxed">{result.profile.strategy}</p>
+                                </div>
+                              )}
+                              {result.profile.opportunities && (
+                                <div className="rounded-xl bg-amber-50 border border-amber-100 p-3.5">
+                                  <p className="text-xs font-semibold uppercase tracking-widest text-amber-700 mb-1">Opportunities for you</p>
+                                  <p className="text-sm text-amber-800 leading-relaxed">{result.profile.opportunities}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           {/* 30-day changes */}
-                          <div className="space-y-2 pt-1 border-t border-gray-50">
-                            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 pt-2">
+                          <div className="space-y-2 border-t border-gray-50 pt-4">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
                               Last 30 days
                               {result.waybackDate && (
                                 <span className="ml-2 normal-case font-normal text-gray-300">
@@ -617,25 +640,24 @@ export default function Dashboard() {
                                 </span>
                               )}
                             </p>
-
                             {result.waybackError === "no_archive" && (
-                              <p className="text-sm text-gray-400">No public archive found — this site isn't indexed by the Wayback Machine. Changes will be tracked from now on.</p>
+                              <p className="text-sm text-gray-400">No public archive found — changes tracked from today.</p>
                             )}
                             {result.waybackError === "scrape_failed" && (
-                              <p className="text-sm text-gray-400">An archive exists but couldn't be read — the site may block automated access to its archived pages.</p>
+                              <p className="text-sm text-gray-400">Archive exists but site blocks automated access — changes tracked from today.</p>
                             )}
                             {result.waybackDate && (result.waybackChanges?.length ?? 0) === 0 && (
-                              <p className="text-sm text-gray-400">No changes detected — their page has been stable over the last 30 days.</p>
+                              <p className="text-sm text-gray-400">Page has been stable over the last 30 days.</p>
                             )}
                             {(result.waybackChanges?.length ?? 0) > 0 && (
-                              <>
+                              <div className="space-y-2">
                                 {result.waybackChanges!.map((change, i) => {
                                   const cfg = changeLabels[change.type];
                                   return (
-                                    <div key={i} className={`rounded-xl border p-3.5 ${cfg.bg}`}>
+                                    <div key={i} className={`rounded-xl border p-3 ${cfg.bg}`}>
                                       <div className="flex items-start gap-2">
                                         <span className="text-sm">{cfg.icon}</span>
-                                        <div className="space-y-1">
+                                        <div className="space-y-0.5">
                                           <p className={`text-sm font-medium ${cfg.text}`}>{cfg.label(change)}</p>
                                           {change.type === "headline" && (
                                             <div className="text-xs space-y-0.5">
@@ -649,31 +671,25 @@ export default function Dashboard() {
                                   );
                                 })}
                                 {result.waybackInsight && (
-                                  <div className="rounded-xl border border-amber-100 bg-amber-50 p-3.5 flex items-start gap-2">
+                                  <div className="rounded-xl border border-amber-100 bg-amber-50 p-3 flex items-start gap-2">
                                     <span className="text-sm">🧠</span>
                                     <p className="text-sm text-amber-800">{result.waybackInsight}</p>
                                   </div>
                                 )}
-                              </>
+                              </div>
                             )}
                           </div>
 
-                          {/* Current state */}
+                          {/* Page details */}
                           {result.snapshot?.headline && (
-                            <div className="space-y-2.5 pt-1 border-t border-gray-50">
-                              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 pt-2">Current page</p>
-                              <div>
-                                <p className="text-xs text-gray-400 mb-0.5">Headline</p>
-                                <p className="text-sm text-gray-800 font-medium">"{result.snapshot.headline}"</p>
-                              </div>
+                            <div className="space-y-3 border-t border-gray-50 pt-4">
+                              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Page details</p>
+                              <p className="text-sm text-gray-800 font-medium">"{result.snapshot.headline}"</p>
                               {result.snapshot.ctas.length > 0 && (
-                                <div>
-                                  <p className="text-xs text-gray-400 mb-1.5">CTAs</p>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {result.snapshot.ctas.slice(0, 6).map((cta, i) => (
-                                      <span key={i} className="text-xs bg-gray-50 border border-gray-200 text-gray-600 px-2.5 py-1 rounded-full">{cta}</span>
-                                    ))}
-                                  </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {result.snapshot.ctas.slice(0, 8).map((cta, i) => (
+                                    <span key={i} className="text-xs bg-gray-50 border border-gray-200 text-gray-600 px-2.5 py-1 rounded-full">{cta}</span>
+                                  ))}
                                 </div>
                               )}
                               <div className="flex gap-2 flex-wrap">
@@ -693,9 +709,6 @@ export default function Dashboard() {
                                     ))}
                                   </div>
                                 </div>
-                              )}
-                              {result.snapshot.client_list?.length === 0 && (
-                                <p className="text-xs text-gray-400">No client names found on this page.</p>
                               )}
                             </div>
                           )}

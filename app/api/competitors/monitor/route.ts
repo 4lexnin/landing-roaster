@@ -19,25 +19,44 @@ async function fetchHtml(url: string): Promise<string> {
 
 function parseSnapshot(html: string): Omit<CompetitorSnapshot, "client_list"> {
   const $ = cheerio.load(html);
+
   const headline = $("h1").first().text().trim() || $("title").first().text().trim();
   const subheadline = $("h2").first().text().trim() || $("meta[name='description']").attr("content")?.trim() || "";
-  const ctas = [...new Set($("a[href], button").map((_, el) => $(el).text().trim()).get().filter(t => t.length > 2 && t.length < 60).slice(0, 12))];
-  const sections = $("h2, h3").map((_, el) => $(el).text().trim()).get().filter(t => t.length > 3 && t.length < 100).slice(0, 10);
+
+  // Only pick up actual CTAs: buttons + non-nav links that are short and action-like
+  // Exclude nav/header/footer links to avoid concatenated nav text
+  const ctaSet = new Set<string>();
+  $("button").each((_, el) => {
+    const t = $(el).clone().children().remove().end().text().trim();
+    if (t.length > 1 && t.length < 40) ctaSet.add(t);
+  });
+  $("a[href]").not("nav a, header a, footer a").each((_, el) => {
+    // Only direct text, not nested text (avoids nav+subtitle concatenations)
+    const t = $(el).clone().children("span, div, p").remove().end().text().trim();
+    if (t.length > 2 && t.length < 35 && !/^http/.test(t)) ctaSet.add(t);
+  });
+  const ctas = [...ctaSet].slice(0, 10);
+
+  const sections = $("h2, h3").map((_, el) => $(el).text().trim()).get()
+    .filter(t => t.length > 3 && t.length < 100).slice(0, 10);
+
   const bodyText = $("body").text();
   const word_count = bodyText.split(/\s+/).filter(Boolean).length;
   const has_social_proof = /testimonial|review|rating|star|customer|client|trusted by|loved by|users|companies/i.test(bodyText);
   const has_pricing = /pricing|price|\$\d|€\d|per month|per year|free plan|paid plan/i.test(bodyText);
+
   const navLinks = new Set<string>();
   $("nav a, header a").each((_, el) => {
     const href = $(el).attr("href");
     if (href && href.startsWith("/") && href.length > 1 && !href.includes("#")) navLinks.add(href.split("?")[0]);
   });
+
   return { headline, subheadline, ctas, sections, has_social_proof, has_pricing, nav_links: [...navLinks].slice(0, 20), word_count };
 }
 
 function extractClientContext(html: string): string {
   const $ = cheerio.load(html);
-  const CLIENT_KEYWORDS = /trusted by|used by|our customers|our clients|join .{0,20}companies|loved by|backed by|powers|customers include|works with/i;
+  const CLIENT_KEYWORDS = /trusted by|used by|our customers|our clients|join .{0,20}companies|loved by|powers|customers include|works with/i;
   const chunks: string[] = [];
 
   $("*").each((_, el) => {
@@ -66,7 +85,10 @@ async function extractClients(html: string): Promise<string[]> {
       model: "gpt-4o-mini",
       messages: [{
         role: "user",
-        content: `From this landing page content, extract company or brand names that are customers/clients of this product. Only real company names — no generic words, no people names, no product features.
+        content: `From this landing page content, extract company names that are CUSTOMERS or CLIENTS of this product — companies that USE or BUY the product.
+
+EXCLUDE: investors, VCs, venture funds, accelerators, advisors, partners, sponsors, press mentions.
+INCLUDE ONLY: companies shown in "trusted by", "used by", "our customers", "clients" sections — companies that are actual end-users of the product.
 
 Return a JSON array of strings, max 20. If none found, return [].
 
@@ -95,13 +117,57 @@ async function scrapeWithClients(url: string): Promise<CompetitorSnapshot> {
   return { ...base, client_list };
 }
 
+export interface CompetitiveProfile {
+  target_audience: string;
+  positioning: string;
+  strategy: string;
+  opportunities: string;
+}
+
+async function generateCompetitiveProfile(hostname: string, snapshot: CompetitorSnapshot): Promise<CompetitiveProfile> {
+  const res = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{
+      role: "user",
+      content: `You are a senior B2B marketing strategist doing competitive intelligence on ${hostname}.
+
+Landing page data:
+- Headline: "${snapshot.headline}"
+- Subheadline: "${snapshot.subheadline}"
+- CTAs: ${JSON.stringify(snapshot.ctas.slice(0, 5))}
+- Page sections: ${JSON.stringify(snapshot.sections.slice(0, 8))}
+- Has social proof: ${snapshot.has_social_proof}
+- Has pricing: ${snapshot.has_pricing}
+- Known clients: ${JSON.stringify(snapshot.client_list?.slice(0, 10) ?? [])}
+
+Return ONLY this JSON (no markdown):
+{
+  "target_audience": "1-2 sentences: who specifically are they targeting? Job title, company size, industry, pain point.",
+  "positioning": "1-2 sentences: what is their unique angle or claim? How do they differentiate?",
+  "strategy": "2-3 sentences: what does this page tell us about their go-to-market? Are they going upmarket/downmarket? Feature-led or outcome-led? Any notable bets?",
+  "opportunities": "2-3 sentences: where are the gaps in their positioning that a competitor could exploit? What are they NOT saying that someone else could own?"
+}`,
+    }],
+    max_tokens: 400,
+    temperature: 0.7,
+  });
+
+  try {
+    const raw = res.choices[0].message.content?.trim() ?? "{}";
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("No JSON");
+    return JSON.parse(match[0]);
+  } catch {
+    return { target_audience: "", positioning: "", strategy: "", opportunities: "" };
+  }
+}
+
 type WaybackResult =
   | { status: "ok"; snapshot: CompetitorSnapshot; date: string }
   | { status: "no_archive" }
   | { status: "scrape_failed" };
 
 async function getWaybackSnapshot(url: string): Promise<WaybackResult> {
-  // Step 1: find an archive URL (fast metadata lookup)
   let archiveUrl: string | null = null;
   let archiveDate: string | null = null;
 
@@ -127,7 +193,6 @@ async function getWaybackSnapshot(url: string): Promise<WaybackResult> {
 
   if (!archiveUrl || !archiveDate) return { status: "no_archive" };
 
-  // Step 2: scrape the archived page — separate error from "no archive"
   try {
     const snapshot = await scrapeWithClients(archiveUrl);
     return { status: "ok", snapshot, date: archiveDate };
@@ -138,14 +203,14 @@ async function getWaybackSnapshot(url: string): Promise<WaybackResult> {
 
 function formatChangesForAI(changes: Change[]): string {
   return changes.map(c => {
-    if (c.type === "headline") return `Headline changed from "${c.from}" to "${c.to}"`;
+    if (c.type === "headline") return `Headline: "${c.from}" → "${c.to}"`;
     if (c.type === "cta_added") return `New CTA: "${c.value}"`;
     if (c.type === "cta_removed") return `CTA removed: "${c.value}"`;
     if (c.type === "social_proof") return c.added ? "Social proof appeared" : "Social proof removed";
     if (c.type === "pricing") return c.added ? "Pricing appeared" : "Pricing removed";
     if (c.type === "nav_added") return `New nav page: ${c.value}`;
     if (c.type === "nav_removed") return `Nav page removed: ${c.value}`;
-    if (c.type === "client_added") return `New client listed: "${c.value}"`;
+    if (c.type === "client_added") return `New client: "${c.value}"`;
     if (c.type === "client_removed") return `Client removed: "${c.value}"`;
     return "";
   }).filter(Boolean).join("\n");
@@ -156,28 +221,10 @@ async function generateInsight(hostname: string, changes: Change[]): Promise<str
     model: "gpt-4o-mini",
     messages: [{
       role: "user",
-      content: `You are a competitive intelligence analyst. ${hostname} made these changes:\n\n${formatChangesForAI(changes)}\n\nIn 1-2 sentences, what does this tell us about their strategy? Be direct and specific.`,
+      content: `Competitive analyst: ${hostname} made these landing page changes:\n\n${formatChangesForAI(changes)}\n\nIn 1-2 sentences, what does this signal about their strategy? Be direct.`,
     }],
     max_tokens: 120,
     temperature: 0.7,
-  });
-  return res.choices[0].message.content?.trim() ?? "";
-}
-
-async function generatePositioning(hostname: string, snapshot: CompetitorSnapshot): Promise<string> {
-  const res = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [{
-      role: "user",
-      content: `Based on this landing page for ${hostname}, write 1-2 sentences on what they sell and who they target. Be specific — no filler.
-
-Headline: "${snapshot.headline}"
-Subheadline: "${snapshot.subheadline}"
-CTAs: ${JSON.stringify(snapshot.ctas.slice(0, 4))}
-Sections: ${JSON.stringify(snapshot.sections.slice(0, 5))}`,
-    }],
-    max_tokens: 100,
-    temperature: 0.5,
   });
   return res.choices[0].message.content?.trim() ?? "";
 }
@@ -189,7 +236,7 @@ export interface MonitorResult {
   isFirstRun: boolean;
   snapshot: CompetitorSnapshot;
   score: HeuristicResult;
-  positioning: string;
+  profile: CompetitiveProfile;
   waybackDate?: string;
   waybackChanges?: Change[];
   waybackInsight?: string;
@@ -213,7 +260,7 @@ export async function POST(req: NextRequest) {
       try {
         const current = await scrapeWithClients(competitor.url);
 
-        const [scoreResult, positioningResult, lastSnapshotResult] = await Promise.allSettled([
+        const [scoreResult, profileResult, lastSnapshotResult] = await Promise.allSettled([
           Promise.resolve(computeScore({
             headline: current.headline,
             subheadline: current.subheadline,
@@ -223,12 +270,12 @@ export async function POST(req: NextRequest) {
             has_pricing: current.has_pricing,
             word_count: current.word_count,
           })),
-          generatePositioning(competitor.hostname, current),
+          generateCompetitiveProfile(competitor.hostname, current),
           supabaseAdmin.from("competitor_snapshots").select("*").eq("competitor_id", competitor.id).order("created_at", { ascending: false }).limit(1).single(),
         ]);
 
         const score = scoreResult.status === "fulfilled" ? scoreResult.value : { total_score: 0, breakdown: { clarity: 0, value: 0, structure: 0, conversion: 0, trust: 0 }, flags: [] };
-        const positioning = positioningResult.status === "fulfilled" ? positioningResult.value : "";
+        const profile = profileResult.status === "fulfilled" ? profileResult.value : { target_audience: "", positioning: "", strategy: "", opportunities: "" };
         const lastSnapshot = lastSnapshotResult.status === "fulfilled" ? lastSnapshotResult.value.data : null;
 
         await supabaseAdmin.from("competitor_snapshots").insert({
@@ -242,7 +289,7 @@ export async function POST(req: NextRequest) {
           client_list: current.client_list,
         });
 
-        // Wayback Machine — always run
+        // Wayback — always try
         let waybackDate: string | undefined;
         let waybackChanges: Change[] | undefined;
         let waybackInsight: string | undefined;
@@ -291,13 +338,14 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        results.push({ competitorId: competitor.id, hostname: competitor.hostname, url: competitor.url, isFirstRun, snapshot: current, score, positioning, waybackDate, waybackChanges, waybackInsight, waybackError, changes, aiInsight });
+        results.push({ competitorId: competitor.id, hostname: competitor.hostname, url: competitor.url, isFirstRun, snapshot: current, score, profile, waybackDate, waybackChanges, waybackInsight, waybackError, changes, aiInsight });
       } catch (err) {
         results.push({
           competitorId: competitor.id, hostname: competitor.hostname, url: competitor.url, isFirstRun: false,
           snapshot: { headline: "", subheadline: "", ctas: [], sections: [], has_social_proof: false, has_pricing: false, nav_links: [], word_count: 0, client_list: [] },
           score: { total_score: 0, breakdown: { clarity: 0, value: 0, structure: 0, conversion: 0, trust: 0 }, flags: [] },
-          positioning: "", changes: [],
+          profile: { target_audience: "", positioning: "", strategy: "", opportunities: "" },
+          changes: [],
           error: err instanceof Error ? err.message : "Failed to scrape",
         });
       }
