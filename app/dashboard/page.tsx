@@ -149,6 +149,17 @@ export default function Dashboard() {
     }
   }
 
+  async function removeRoast(id: string) {
+    if (!user) return;
+    await fetch("/api/roasts", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, userId: user.id }),
+    });
+    setRoasts(prev => prev.filter(r => r.id !== id));
+    if (expanded === id) setExpanded(null);
+  }
+
   async function removeCompetitor(id: string) {
     await fetch(`/api/competitors/${id}`, { method: "DELETE" });
     setCompetitors(prev => prev.filter(c => c.id !== id));
@@ -714,6 +725,12 @@ export default function Dashboard() {
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-md tabular-nums ${scoreLabel(roast.score)}`}>
                           {roast.score}/10
                         </span>
+                        <button
+                          onClick={e => { e.stopPropagation(); removeRoast(roast.id); }}
+                          className="text-gray-300 hover:text-red-400 transition-colors text-xs p-1"
+                        >
+                          ✕
+                        </button>
                         <span className="text-gray-300 text-xs">{expanded === roast.id ? "▲" : "▼"}</span>
                       </button>
 

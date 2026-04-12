@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 
+export async function DELETE(req: NextRequest) {
+  const { id, userId } = await req.json();
+  if (!id || !userId) return NextResponse.json({ error: "Missing params" }, { status: 400 });
+  await supabaseAdmin.from("roasts").delete().eq("id", id).eq("user_id", userId);
+  return NextResponse.json({ ok: true });
+}
+
 export async function GET(req: NextRequest) {
   const userId = req.nextUrl.searchParams.get("userId");
   if (!userId) return NextResponse.json({ roasts: [] });
