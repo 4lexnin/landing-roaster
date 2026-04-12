@@ -3,7 +3,6 @@ import * as cheerio from "cheerio";
 import OpenAI from "openai";
 import { computeScore } from "@/lib/scoring";
 import { ScrapedData, CompetitorEntry, ComparisonResult } from "@/lib/types";
-import { supabaseAdmin } from "@/lib/supabase";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -110,16 +109,6 @@ export async function POST(req: NextRequest) {
     const { userId, scraped, yourScore } = await req.json();
 
     if (!userId) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
-
-    const { data: sub } = await supabaseAdmin
-      .from("subscriptions")
-      .select("status")
-      .eq("user_id", userId)
-      .single();
-
-    if (sub?.status !== "active") {
-      return NextResponse.json({ error: "Pro subscription required" }, { status: 403 });
-    }
 
     const competitorUrls = await findCompetitorUrls(scraped.headline, scraped.subheadline);
 
