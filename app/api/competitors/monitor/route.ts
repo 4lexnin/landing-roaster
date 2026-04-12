@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as cheerio from "cheerio";
+import OpenAI from "openai";
 import { supabaseAdmin } from "@/lib/supabase";
 import { detectChanges, CompetitorSnapshot, Change } from "@/lib/changeDetector";
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 async function scrape(url: string): Promise<CompetitorSnapshot> {
   const res = await fetch(url, {
@@ -45,12 +48,57 @@ async function scrape(url: string): Promise<CompetitorSnapshot> {
   };
 }
 
+async function getWaybackSnapshot(url: string): Promise<{ snapshot: CompetitorSnapshot; date: string } | null> {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const timestamp = thirtyDaysAgo.toISOString().replace(/\D/g, "").slice(0, 14);
+
+  const availRes = await fetch(
+    `https://archive.org/wayback/available?url=${encodeURIComponent(url)}&timestamp=${timestamp}`,
+    { signal: AbortSignal.timeout(6000) }
+  );
+  const availData = await availRes.json();
+  const closest = availData?.archived_snapshots?.closest;
+  if (!closest?.available || !closest?.url) return null;
+
+  const snapshot = await scrape(closest.url);
+  return { snapshot, date: closest.timestamp };
+}
+
+function formatChangesForAI(changes: Change[]): string {
+  return changes.map(c => {
+    if (c.type === "headline") return `Headline changed from "${c.from}" to "${c.to}"`;
+    if (c.type === "cta_added") return `New CTA added: "${c.value}"`;
+    if (c.type === "cta_removed") return `CTA removed: "${c.value}"`;
+    if (c.type === "social_proof") return c.added ? "Social proof section appeared" : "Social proof section removed";
+    if (c.type === "pricing") return c.added ? "Pricing section appeared" : "Pricing section removed";
+    if (c.type === "nav_added") return `New page added to nav: ${c.value}`;
+    if (c.type === "nav_removed") return `Page removed from nav: ${c.value}`;
+    return "";
+  }).filter(Boolean).join("\n");
+}
+
+async function generateInsight(hostname: string, changes: Change[]): Promise<string> {
+  const changeList = formatChangesForAI(changes);
+  const res = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{
+      role: "user",
+      content: `You are a competitive intelligence analyst. ${hostname} made these changes to their landing page:\n\n${changeList}\n\nIn 1-2 sentences, what does this tell us about their strategy or direction? Be direct and specific.`,
+    }],
+    max_tokens: 120,
+    temperature: 0.7,
+  });
+  return res.choices[0].message.content?.trim() ?? "";
+}
+
 export interface MonitorResult {
   competitorId: string;
   hostname: string;
   url: string;
   isFirstRun: boolean;
+  waybackDate?: string;
   changes: Change[];
+  aiInsight?: string;
   snapshot: CompetitorSnapshot;
   error?: string;
 }
@@ -94,7 +142,36 @@ export async function POST(req: NextRequest) {
         });
 
         if (!lastSnapshot) {
-          results.push({ competitorId: competitor.id, hostname: competitor.hostname, url: competitor.url, isFirstRun: true, changes: [], snapshot: current });
+          // First run — try Wayback Machine for immediate value
+          let waybackDate: string | undefined;
+          let changes: Change[] = [];
+          let aiInsight: string | undefined;
+
+          try {
+            const wayback = await getWaybackSnapshot(competitor.url);
+            if (wayback) {
+              waybackDate = wayback.date;
+              changes = detectChanges(wayback.snapshot, current);
+              if (changes.length > 0) {
+                aiInsight = await generateInsight(competitor.hostname, changes);
+                await supabaseAdmin.from("competitor_changes").insert(
+                  changes.map((c) => ({
+                    competitor_id: competitor.id,
+                    user_id: userId,
+                    change_type: c.type,
+                    from_value: c.from ?? null,
+                    to_value: c.to ?? null,
+                    value: c.value ?? null,
+                    added: c.added ?? null,
+                  }))
+                );
+              }
+            }
+          } catch {
+            // Wayback unavailable — fall through with empty changes
+          }
+
+          results.push({ competitorId: competitor.id, hostname: competitor.hostname, url: competitor.url, isFirstRun: true, waybackDate, changes, aiInsight, snapshot: current });
           return;
         }
 
@@ -107,7 +184,24 @@ export async function POST(req: NextRequest) {
         };
 
         const changes = detectChanges(prev, current);
-        results.push({ competitorId: competitor.id, hostname: competitor.hostname, url: competitor.url, isFirstRun: false, changes, snapshot: current });
+        let aiInsight: string | undefined;
+
+        if (changes.length > 0) {
+          aiInsight = await generateInsight(competitor.hostname, changes);
+          await supabaseAdmin.from("competitor_changes").insert(
+            changes.map((c) => ({
+              competitor_id: competitor.id,
+              user_id: userId,
+              change_type: c.type,
+              from_value: c.from ?? null,
+              to_value: c.to ?? null,
+              value: c.value ?? null,
+              added: c.added ?? null,
+            }))
+          );
+        }
+
+        results.push({ competitorId: competitor.id, hostname: competitor.hostname, url: competitor.url, isFirstRun: false, changes, aiInsight, snapshot: current });
       } catch (err) {
         results.push({
           competitorId: competitor.id,

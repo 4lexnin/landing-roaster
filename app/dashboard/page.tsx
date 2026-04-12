@@ -32,8 +32,22 @@ interface MonitorResult {
   hostname: string;
   url: string;
   isFirstRun: boolean;
+  waybackDate?: string;
   changes: Change[];
+  aiInsight?: string;
   error?: string;
+}
+
+interface PersistedChange {
+  id: string;
+  competitor_id: string;
+  change_type: Change["type"];
+  from_value: string | null;
+  to_value: string | null;
+  value: string | null;
+  added: boolean | null;
+  detected_at: string;
+  competitors: { hostname: string; url: string };
 }
 
 function scoreColor(score: number) {
@@ -91,6 +105,8 @@ export default function Dashboard() {
   const [monitoring, setMonitoring] = useState(false);
   const [monitorResults, setMonitorResults] = useState<MonitorResult[] | null>(null);
   const [lastChecked, setLastChecked] = useState<string | null>(null);
+  const [changeHistory, setChangeHistory] = useState<PersistedChange[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -118,6 +134,10 @@ export default function Dashboard() {
     fetch(`/api/competitors?userId=${user.id}`)
       .then(r => r.json())
       .then(d => { setCompetitors(d.competitors ?? []); setCompetitorsLoading(false); });
+    setHistoryLoading(true);
+    fetch(`/api/competitors/changes?userId=${user.id}`)
+      .then(r => r.json())
+      .then(d => { setChangeHistory(d.changes ?? []); setHistoryLoading(false); });
   }, [isPro, user, view]);
 
   async function addCompetitor() {
@@ -156,6 +176,10 @@ export default function Dashboard() {
       const data = await res.json();
       setMonitorResults(data.results ?? []);
       setLastChecked(data.checkedAt);
+      // Refresh persisted history
+      const historyRes = await fetch(`/api/competitors/changes?userId=${user.id}`);
+      const historyData = await historyRes.json();
+      setChangeHistory(historyData.changes ?? []);
     } finally {
       setMonitoring(false);
     }
@@ -399,6 +423,50 @@ export default function Dashboard() {
                 )}
               </div>
 
+              {/* Change history */}
+              {(historyLoading || changeHistory.length > 0) && (
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Change history</p>
+                  {historyLoading ? (
+                    <div className="flex justify-center py-8">
+                      <span className="w-4 h-4 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin" />
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
+                      {changeHistory.map((c) => {
+                        const changeAsChange: Change = {
+                          type: c.change_type,
+                          from: c.from_value ?? undefined,
+                          to: c.to_value ?? undefined,
+                          value: c.value ?? undefined,
+                          added: c.added ?? undefined,
+                        };
+                        const cfg = changeLabels[c.change_type];
+                        return (
+                          <div key={c.id} className="flex items-start gap-3 px-5 py-3.5">
+                            <span className="text-sm mt-0.5">{cfg.icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-gray-500">{c.competitors?.hostname}</span>
+                                <span className="text-xs text-gray-300">·</span>
+                                <span className="text-xs text-gray-400">{timeAgo(c.detected_at)}</span>
+                              </div>
+                              <p className={`text-sm font-medium mt-0.5 ${cfg.text}`}>{cfg.label(changeAsChange)}</p>
+                              {c.change_type === "headline" && (
+                                <div className="text-xs mt-1 space-y-0.5">
+                                  <p className="text-gray-400 line-through">{c.from_value}</p>
+                                  <p className="text-gray-700 font-medium">{c.to_value}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Monitor results */}
               {monitorResults && (
                 <div className="space-y-4">
@@ -413,7 +481,9 @@ export default function Dashboard() {
                     <div key={result.competitorId} className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-semibold text-gray-900">{result.hostname}</p>
-                        {result.isFirstRun ? (
+                        {result.isFirstRun && result.changes.length > 0 ? (
+                          <span className="text-xs bg-amber-50 text-amber-700 border border-amber-100 px-2.5 py-1 rounded-full font-medium">{result.changes.length} change{result.changes.length !== 1 ? "s" : ""} (last 30d)</span>
+                        ) : result.isFirstRun ? (
                           <span className="text-xs bg-blue-50 text-blue-700 border border-blue-100 px-2.5 py-1 rounded-full font-medium">Baseline saved</span>
                         ) : result.error ? (
                           <span className="text-xs bg-red-50 text-red-600 border border-red-100 px-2.5 py-1 rounded-full font-medium">Failed to scan</span>
@@ -424,14 +494,25 @@ export default function Dashboard() {
                         )}
                       </div>
 
-                      {result.isFirstRun && (
-                        <p className="text-sm text-gray-500">First scan complete. Run monitoring again to detect future changes.</p>
+                      {result.isFirstRun && !result.waybackDate && (
+                        <p className="text-sm text-gray-500">Baseline saved. Run monitoring again to detect future changes.</p>
+                      )}
+
+                      {result.isFirstRun && result.waybackDate && result.changes.length === 0 && (
+                        <p className="text-sm text-gray-500">Compared against a 30-day-old snapshot — no changes found.</p>
                       )}
 
                       {result.error && <p className="text-sm text-red-500">{result.error}</p>}
 
-                      {!result.isFirstRun && result.changes.length > 0 && (
+                      {result.changes.length > 0 && (
                         <div className="space-y-2">
+                          {result.isFirstRun && result.waybackDate && (
+                            <p className="text-xs text-gray-400 mb-1">
+                              Changes detected vs. snapshot from {new Date(
+                                result.waybackDate.replace(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/, "$1-$2-$3T$4:$5:$6")
+                              ).toLocaleDateString()}
+                            </p>
+                          )}
                           {result.changes.map((change, i) => {
                             const cfg = changeLabels[change.type];
                             return (
@@ -451,6 +532,12 @@ export default function Dashboard() {
                               </div>
                             );
                           })}
+                          {result.aiInsight && (
+                            <div className="rounded-xl border border-amber-100 bg-amber-50 p-3.5 flex items-start gap-2">
+                              <span className="text-sm">🧠</span>
+                              <p className="text-sm text-amber-800">{result.aiInsight}</p>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
