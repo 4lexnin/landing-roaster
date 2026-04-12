@@ -35,7 +35,7 @@ interface MonitorResult {
   isFirstRun: boolean;
   snapshot: CompetitorSnapshot;
   score: { total_score: number; breakdown: Record<string, number>; flags: string[]; breakdown_flags: Record<string, string[]> };
-  profile: { target_audience: string; positioning: string; strategy: string; opportunities: string };
+  profile: { target_audience: string; positioning: string; strategy: string; opportunities: string; gaps: string[] };
   changes: Change[];
   aiInsight?: string;
   error?: string;
@@ -79,9 +79,6 @@ export default function Dashboard() {
   const [roasts, setRoasts] = useState<SavedRoast[]>([]);
   const [roastsLoading, setRoastsLoading] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [comparisons, setComparisons] = useState<Record<string, ComparisonResult>>({});
-  const [comparing, setComparing] = useState<string | null>(null);
-  const [compareErrors, setCompareErrors] = useState<Record<string, string>>({});
 
   // New analysis state
   const [analysisUrl, setAnalysisUrl] = useState("");
@@ -227,25 +224,6 @@ export default function Dashboard() {
     }
   }
 
-  async function runComparison(roast: SavedRoast) {
-    setComparing(roast.id);
-    setCompareErrors(prev => ({ ...prev, [roast.id]: "" }));
-    try {
-      const res = await fetch("/api/compare", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user!.id, scraped: roast.result.scraped, yourScore: roast.score }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Something went wrong");
-      setComparisons(prev => ({ ...prev, [roast.id]: data }));
-    } catch (err) {
-      setCompareErrors(prev => ({ ...prev, [roast.id]: err instanceof Error ? err.message : "Failed" }));
-    } finally {
-      setComparing(null);
-    }
-  }
-
   async function runAnalysis() {
     if (!analysisUrl.trim() || !user) return;
     setAnalysisLoading(true);
@@ -321,8 +299,8 @@ export default function Dashboard() {
 
         <nav className="flex-1 px-3 space-y-0.5">
           {([
-            ["intel",     "Competitors"],
-            ["analyses",  "My Pages"],
+            ["intel",     "Market Intel"],
+            ["analyses",  "Your Pages"],
           ] as const).map(([v, label]) => (
             <button
               key={v}
@@ -344,7 +322,7 @@ export default function Dashboard() {
                 : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
             }`}
           >
-            + New Analysis
+            Run Analysis
           </button>
         </nav>
 
@@ -367,7 +345,7 @@ export default function Dashboard() {
               {/* Header */}
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h1 className="text-base font-semibold text-gray-900">Competitors</h1>
+                  <h1 className="text-base font-semibold text-gray-900">Market Intel</h1>
                   <p className="text-sm text-gray-400 mt-0.5">Track what your competitors change on their site</p>
                 </div>
                 {competitors.length > 0 && (
@@ -514,28 +492,27 @@ export default function Dashboard() {
 
                         {/* Expanded content */}
                         {isOpen && result && !result.error && (() => {
-                          const weakSignals = Object.values(result.score.breakdown_flags ?? {}).flat().slice(0, 4);
                           const profileOpen = showFullProfile[competitor.id];
                           return (
                             <div className="px-5 pb-5 pt-4 border-t border-gray-50 space-y-5">
 
-                              {/* Hero: opportunity */}
+                              {/* Hero: biggest opportunity */}
                               {result.profile.opportunities && (
                                 <div className="border-l-2 border-amber-400 bg-amber-50 rounded-r-lg px-4 py-3">
-                                  <p className="text-[11px] font-semibold text-amber-600 uppercase tracking-wider mb-1">Your opening</p>
+                                  <p className="text-[11px] font-semibold text-amber-600 uppercase tracking-wider mb-1">Biggest opportunity</p>
                                   <p className="text-sm text-gray-900 leading-relaxed">{result.profile.opportunities}</p>
                                 </div>
                               )}
 
-                              {/* Weak signals */}
-                              {weakSignals.length > 0 && (
+                              {/* Gaps to exploit */}
+                              {result.profile.gaps?.length > 0 && (
                                 <div>
-                                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Their weak spots</p>
+                                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Gaps to exploit</p>
                                   <ul className="space-y-1">
-                                    {weakSignals.map((flag, i) => (
+                                    {result.profile.gaps.map((gap, i) => (
                                       <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
                                         <span className="text-gray-300 mt-0.5 shrink-0">·</span>
-                                        {flag}
+                                        {gap}
                                       </li>
                                     ))}
                                   </ul>
@@ -702,7 +679,7 @@ export default function Dashboard() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-base font-semibold text-gray-900">My Pages</h1>
+                  <h1 className="text-base font-semibold text-gray-900">Your Pages</h1>
                   <p className="text-sm text-gray-400 mt-0.5">{roasts.length} page{roasts.length !== 1 ? "s" : ""} analysed</p>
                 </div>
                 <button
@@ -771,24 +748,13 @@ export default function Dashboard() {
                           </div>
 
                           <div className="border-t border-gray-200 pt-5">
-                            <p className="text-xs text-gray-400 uppercase tracking-widest mb-4">Competitor analysis</p>
-                            {comparisons[roast.id] ? (
-                              <ComparisonCard yourScore={roast.result.score} comparison={comparisons[roast.id]} />
-                            ) : (
-                              <div className="space-y-2">
-                                {compareErrors[roast.id] && <p className="text-xs text-red-500">{compareErrors[roast.id]}</p>}
-                                <button
-                                  onClick={() => runComparison(roast)}
-                                  disabled={comparing === roast.id}
-                                  className={BTN}
-                                  style={BTN_COLOR}
-                                >
-                                  {comparing === roast.id ? (
-                                    <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Finding competitors...</>
-                                  ) : "Run competitor analysis"}
-                                </button>
-                              </div>
-                            )}
+                            <button
+                              onClick={() => setView("intel")}
+                              className={BTN}
+                              style={BTN_COLOR}
+                            >
+                              View competitor intel →
+                            </button>
                           </div>
                         </div>
                       )}

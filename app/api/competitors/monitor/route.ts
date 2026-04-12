@@ -126,6 +126,7 @@ export interface CompetitiveProfile {
   positioning: string;
   strategy: string;
   opportunities: string;
+  gaps: string[];
 }
 
 async function generateCompetitiveProfile(hostname: string, snapshot: CompetitorSnapshot): Promise<CompetitiveProfile> {
@@ -133,7 +134,7 @@ async function generateCompetitiveProfile(hostname: string, snapshot: Competitor
     model: "gpt-4o-mini",
     messages: [{
       role: "user",
-      content: `You are a B2B marketing strategist. Analyse ${hostname}'s landing page and return sharp, one-sentence insights. No filler, no "they are", no "this company".
+      content: `You are a ruthless competitive strategist. Analyse ${hostname}'s landing page. Be direct, specific, and actionable. No consultant language. No filler.
 
 Data:
 - Headline: "${snapshot.headline}"
@@ -145,10 +146,11 @@ Data:
 
 Return ONLY this JSON (no markdown):
 {
-  "target_audience": "Max 15 words. Who exactly. e.g. 'Enterprise compliance teams at crypto-native financial institutions.'",
-  "positioning": "Max 15 words. Their unique angle. e.g. 'The only audit-ready blockchain analytics built for regulated industries.'",
-  "strategy": "Max 20 words. One key strategic signal from the page. e.g. 'Going upmarket via enterprise logos and compliance framing — abandoning self-serve.'",
-  "opportunities": "Max 25 words. The gap a competitor could own. e.g. 'No mention of ROI or time-to-value — an easy wedge for a challenger with a faster onboarding story.'"
+  "target_audience": "Max 10 words. Who exactly. e.g. 'Enterprise crypto compliance teams.'",
+  "positioning": "Max 12 words. Their core claim. e.g. 'Audit-ready blockchain analytics for regulated industries.'",
+  "strategy": "Max 20 words. One concrete move they're making. e.g. 'Pushing enterprise logos hard — ditching self-serve to close bigger deals.'",
+  "opportunities": "Max 25 words. Start with a verb. What a competitor should do NOW to beat them. e.g. 'Lead with time-to-value — they ignore ROI entirely, easy wedge for a faster onboarding story.'",
+  "gaps": ["Max 6 words each. 2-3 specific, exploitable weaknesses. e.g. 'No pricing transparency', 'Weak social proof', 'Generic headline with no hook'"]
 }`,
     }],
     max_tokens: 400,
@@ -161,7 +163,7 @@ Return ONLY this JSON (no markdown):
     if (!match) throw new Error("No JSON");
     return JSON.parse(match[0]);
   } catch {
-    return { target_audience: "", positioning: "", strategy: "", opportunities: "" };
+    return { target_audience: "", positioning: "", strategy: "", opportunities: "", gaps: [] };
   }
 }
 
@@ -238,7 +240,7 @@ export async function POST(req: NextRequest) {
         ]);
 
         const score = scoreResult.status === "fulfilled" ? scoreResult.value : { total_score: 0, breakdown: { clarity: 0, value: 0, structure: 0, conversion: 0, trust: 0 }, flags: [], breakdown_flags: { clarity: [], value: [], structure: [], conversion: [], trust: [] } };
-        const profile = profileResult.status === "fulfilled" ? profileResult.value : { target_audience: "", positioning: "", strategy: "", opportunities: "" };
+        const profile = profileResult.status === "fulfilled" ? profileResult.value : { target_audience: "", positioning: "", strategy: "", opportunities: "", gaps: [] };
         const lastSnapshot = lastSnapshotResult.status === "fulfilled" ? lastSnapshotResult.value.data : null;
 
         await supabaseAdmin.from("competitor_snapshots").insert({
@@ -292,7 +294,7 @@ export async function POST(req: NextRequest) {
           competitorId: competitor.id, hostname: competitor.hostname, url: competitor.url, isFirstRun: false,
           snapshot: { headline: "", subheadline: "", ctas: [], sections: [], has_social_proof: false, has_pricing: false, nav_links: [], word_count: 0, client_list: [] },
           score: { total_score: 0, breakdown: { clarity: 0, value: 0, structure: 0, conversion: 0, trust: 0 }, flags: [], breakdown_flags: { clarity: [], value: [], structure: [], conversion: [], trust: [] } },
-          profile: { target_audience: "", positioning: "", strategy: "", opportunities: "" },
+          profile: { target_audience: "", positioning: "", strategy: "", opportunities: "", gaps: [] },
           changes: [],
           error: err instanceof Error ? err.message : "Failed to scrape",
         });
