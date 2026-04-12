@@ -5,11 +5,12 @@ import { useUser, UserButton } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ScoreBar } from "@/components/ScoreBar";
+import { ScoreRing } from "@/components/ScoreRing";
 import { ComparisonCard } from "@/components/ComparisonCard";
 import { RoastResult, ComparisonResult } from "@/lib/types";
 import { Change } from "@/lib/changeDetector";
 
-type View = "analyses" | "intel" | "leaderboard";
+type View = "analyses" | "intel" | "leaderboard" | "new";
 
 interface SavedRoast {
   id: string;
@@ -96,6 +97,15 @@ export default function Dashboard() {
   const [comparisons, setComparisons] = useState<Record<string, ComparisonResult>>({});
   const [comparing, setComparing] = useState<string | null>(null);
   const [compareErrors, setCompareErrors] = useState<Record<string, string>>({});
+
+  // New analysis state
+  const [analysisUrl, setAnalysisUrl] = useState("");
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<RoastResult | null>(null);
+  const [analysisError, setAnalysisError] = useState("");
+  const [newComparison, setNewComparison] = useState<ComparisonResult | null>(null);
+  const [newComparing, setNewComparing] = useState(false);
+  const [newCompareError, setNewCompareError] = useState("");
 
   // Market Intel state
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
@@ -204,6 +214,53 @@ export default function Dashboard() {
     }
   }
 
+  async function runAnalysis() {
+    if (!analysisUrl.trim() || !user) return;
+    setAnalysisLoading(true);
+    setAnalysisError("");
+    setAnalysisResult(null);
+    setNewComparison(null);
+    setNewCompareError("");
+    try {
+      const res = await fetch("/api/roast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: analysisUrl.trim(), userId: user.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Something went wrong");
+      setAnalysisResult(data);
+      // Refresh history list
+      fetch(`/api/roasts?userId=${user.id}`)
+        .then(r => r.json())
+        .then(d => setRoasts(d.roasts ?? []));
+    } catch (err) {
+      setAnalysisError(err instanceof Error ? err.message : "Failed to analyse");
+    } finally {
+      setAnalysisLoading(false);
+    }
+  }
+
+  async function runNewComparison() {
+    if (!analysisResult || !user) return;
+    setNewComparing(true);
+    setNewCompareError("");
+    try {
+      const res = await fetch("/api/compare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, scraped: analysisResult.scraped, yourScore: analysisResult.score.total_score }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Something went wrong");
+      setNewComparison(data);
+    } catch (err) {
+      setNewCompareError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setNewComparing(false);
+    }
+  }
+
   if (!isLoaded || !proLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -225,7 +282,7 @@ export default function Dashboard() {
 
         <nav className="flex-1 px-3 py-4 space-y-1">
           {(["analyses", "intel", "leaderboard"] as const).map((v) => {
-            const labels = { analyses: ["📋", "My Analysis"], intel: ["🔍", "Market Intel"], leaderboard: ["🏆", "Leaderboard"] };
+            const labels: Record<string, [string, string]> = { analyses: ["📋", "My Analysis"], intel: ["🔍", "Market Intel"], leaderboard: ["🏆", "Leaderboard"] };
             return (
               <button
                 key={v}
@@ -239,13 +296,15 @@ export default function Dashboard() {
               </button>
             );
           })}
-          <Link
-            href="/"
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors"
+          <button
+            onClick={() => { setView("new"); setAnalysisResult(null); setAnalysisUrl(""); setAnalysisError(""); setNewComparison(null); }}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
+              view === "new" ? "bg-gray-100 text-gray-900" : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+            }`}
           >
             <span className="text-base">🔥</span>
             New Analysis
-          </Link>
+          </button>
         </nav>
 
         <div className="px-4 py-4 border-t border-gray-100 flex items-center gap-3">
@@ -269,9 +328,13 @@ export default function Dashboard() {
                   <h1 className="text-lg font-semibold text-gray-900">My Analysis</h1>
                   <p className="text-sm text-gray-400 mt-0.5">{roasts.length} page{roasts.length !== 1 ? "s" : ""} analysed</p>
                 </div>
-                <Link href="/" className="text-sm font-medium px-4 py-2 rounded-lg text-white" style={{ backgroundColor: "#92400e" }}>
+                <button
+                  onClick={() => { setView("new"); setAnalysisResult(null); setAnalysisUrl(""); setAnalysisError(""); setNewComparison(null); }}
+                  className="text-sm font-medium px-4 py-2 rounded-lg text-white"
+                  style={{ backgroundColor: "#92400e" }}
+                >
                   + New Analysis
-                </Link>
+                </button>
               </div>
 
               {roastsLoading ? (
@@ -283,9 +346,13 @@ export default function Dashboard() {
                   <p className="text-2xl mb-3">🍞</p>
                   <p className="text-sm font-medium text-gray-700 mb-1">No analyses yet</p>
                   <p className="text-sm text-gray-400 mb-6">Analyse your first landing page to get started.</p>
-                  <Link href="/" className="text-sm font-medium px-5 py-2.5 rounded-lg text-white inline-block" style={{ backgroundColor: "#92400e" }}>
+                  <button
+                    onClick={() => { setView("new"); setAnalysisResult(null); setAnalysisUrl(""); setAnalysisError(""); setNewComparison(null); }}
+                    className="text-sm font-medium px-5 py-2.5 rounded-lg text-white inline-block"
+                    style={{ backgroundColor: "#92400e" }}
+                  >
                     Analyse a page
-                  </Link>
+                  </button>
                 </div>
               ) : (
                 <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
@@ -542,6 +609,128 @@ export default function Dashboard() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* New Analysis */}
+          {view === "new" && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-lg font-semibold text-gray-900">New Analysis</h1>
+                <p className="text-sm text-gray-400 mt-0.5">Enter your landing page URL to get a full breakdown</p>
+              </div>
+
+              {!analysisResult && (
+                <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={analysisUrl}
+                      onChange={e => setAnalysisUrl(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && !analysisLoading && runAnalysis()}
+                      placeholder="https://yourpage.com"
+                      className="flex-1 text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 outline-none focus:border-gray-400 transition-colors"
+                    />
+                    <button
+                      onClick={runAnalysis}
+                      disabled={analysisLoading || !analysisUrl.trim()}
+                      className="text-sm font-medium px-5 py-2.5 rounded-lg text-white disabled:opacity-40 flex items-center gap-2"
+                      style={{ backgroundColor: "#92400e" }}
+                    >
+                      {analysisLoading ? (
+                        <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Analysing...</>
+                      ) : "Analyse"}
+                    </button>
+                  </div>
+                  {analysisError && <p className="text-sm text-red-500">{analysisError}</p>}
+                </div>
+              )}
+
+              {analysisResult && (
+                <div className="space-y-5">
+                  {/* Score */}
+                  <div className="bg-white border border-gray-100 rounded-2xl p-8 flex flex-col items-center gap-3">
+                    <ScoreRing score={analysisResult.score.total_score} />
+                    {analysisResult.score.flags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 justify-center">
+                        {analysisResult.score.flags.map((flag, i) => (
+                          <span key={i} className="px-2.5 py-1 text-xs bg-red-50 text-red-600 border border-red-100 rounded-full">{flag}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Score breakdown */}
+                  <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Score Breakdown</p>
+                    <div className="space-y-4">
+                      {(["clarity", "value", "structure", "conversion", "trust"] as const).map(key => (
+                        <ScoreBar
+                          key={key}
+                          label={key.charAt(0).toUpperCase() + key.slice(1)}
+                          description=""
+                          score={analysisResult.score.breakdown[key]}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Key issues */}
+                  <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Key Issues</p>
+                    <ul className="space-y-3">
+                      {analysisResult.llm.weaknesses.map((w, i) => (
+                        <li key={i} className="flex items-start gap-3">
+                          <span className="mt-0.5 flex-shrink-0 w-5 h-5 bg-red-50 text-red-500 rounded-full flex items-center justify-center text-xs font-bold">{i + 1}</span>
+                          <span className="text-sm text-gray-700 leading-relaxed">{w}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* How to fix */}
+                  <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">How to Fix It</p>
+                    <ul className="space-y-3">
+                      {analysisResult.llm.improvements.map((imp, i) => (
+                        <li key={i} className="flex items-start gap-3">
+                          <span className="mt-0.5 flex-shrink-0 w-5 h-5 bg-green-50 text-green-600 rounded-full flex items-center justify-center text-xs font-bold">✓</span>
+                          <span className="text-sm text-gray-700 leading-relaxed">{imp}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Competitor analysis */}
+                  <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Competitor Analysis</p>
+                    {newComparison ? (
+                      <ComparisonCard yourScore={analysisResult.score} comparison={newComparison} />
+                    ) : (
+                      <div className="space-y-2">
+                        {newCompareError && <p className="text-xs text-red-500">{newCompareError}</p>}
+                        <button
+                          onClick={runNewComparison}
+                          disabled={newComparing}
+                          className="text-sm font-medium px-5 py-2.5 rounded-lg text-white disabled:opacity-50 flex items-center gap-2"
+                          style={{ backgroundColor: "#92400e" }}
+                        >
+                          {newComparing ? (
+                            <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Finding competitors...</>
+                          ) : "Run competitor analysis"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => { setAnalysisResult(null); setAnalysisUrl(""); setNewComparison(null); setNewCompareError(""); }}
+                    className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    ← Analyse another page
+                  </button>
                 </div>
               )}
             </div>
