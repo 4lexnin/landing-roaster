@@ -3,7 +3,6 @@
 import { RoastResult } from "@/lib/types";
 import { ScoreRing } from "./ScoreRing";
 import { ScoreBar } from "./ScoreBar";
-import { ShareBar } from "./ShareBar";
 import { useUser, SignInButton } from "@clerk/nextjs";
 
 interface Props {
@@ -24,11 +23,7 @@ export function RoastResults({ result, onRoastAnother }: Props) {
   const { isSignedIn } = useUser();
 
   const hostname = (() => {
-    try {
-      return new URL(url).hostname;
-    } catch {
-      return url;
-    }
+    try { return new URL(url).hostname; } catch { return url; }
   })();
 
   return (
@@ -45,10 +40,7 @@ export function RoastResults({ result, onRoastAnother }: Props) {
         {score.flags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 justify-center mt-3">
             {score.flags.map((flag, i) => (
-              <span
-                key={i}
-                className="px-2.5 py-1 text-xs bg-red-50 text-red-600 border border-red-100 rounded-full"
-              >
+              <span key={i} className="px-2.5 py-1 text-xs bg-red-50 text-red-600 border border-red-100 rounded-full">
                 {flag}
               </span>
             ))}
@@ -56,96 +48,70 @@ export function RoastResults({ result, onRoastAnother }: Props) {
         )}
       </div>
 
+      {/* CTA — shown immediately after score */}
+      {!isSignedIn && (
+        <div className="rounded-2xl p-6 space-y-3" style={{ backgroundColor: "#92400e" }}>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-white">See how you compare to your competitors</p>
+            <p className="text-xs text-amber-200">Track competitor changes, get weekly intel — free.</p>
+          </div>
+          <SignInButton mode="modal" forceRedirectUrl="/dashboard">
+            <button className="w-full text-sm font-semibold py-2.5 rounded-xl bg-white transition-colors" style={{ color: "#92400e" }}>
+              Sign in with Google — it's free
+            </button>
+          </SignInButton>
+        </div>
+      )}
+
+      {isSignedIn && (
+        <a
+          href="/dashboard"
+          className="block w-full text-sm font-semibold py-3 rounded-2xl text-center text-white transition-colors"
+          style={{ backgroundColor: "#92400e" }}
+        >
+          Open dashboard →
+        </a>
+      )}
+
       {/* Score Breakdown */}
       <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-          Score Breakdown
-        </h2>
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">Score Breakdown</h2>
         <div className="space-y-4">
           {(Object.keys(categoryMeta) as (keyof typeof categoryMeta)[]).map((key) => (
-            <ScoreBar
-              key={key}
-              label={categoryMeta[key].label}
-              description={categoryMeta[key].description}
-              score={score.breakdown[key]}
-            />
+            <ScoreBar key={key} label={categoryMeta[key].label} description={categoryMeta[key].description} score={score.breakdown[key]} />
           ))}
         </div>
       </div>
 
       {/* Key Issues */}
       <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-          Key Issues
-        </h2>
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">Key Issues</h2>
         <ul className="space-y-3">
           {llm.weaknesses.map((w, i) => (
             <li key={i} className="flex items-start gap-3">
-              <span className="mt-0.5 flex-shrink-0 w-5 h-5 bg-red-50 text-red-500 rounded-full flex items-center justify-center text-xs font-bold">
-                {i + 1}
-              </span>
+              <span className="mt-0.5 flex-shrink-0 w-5 h-5 bg-red-50 text-red-500 rounded-full flex items-center justify-center text-xs font-bold">{i + 1}</span>
               <span className="text-sm text-gray-700 leading-relaxed">{w}</span>
             </li>
           ))}
         </ul>
       </div>
 
-      {/* Improvements */}
+      {/* How to fix */}
       <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-          How to Fix It
-        </h2>
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">How to Fix It</h2>
         <ul className="space-y-3">
           {llm.improvements.map((imp, i) => (
             <li key={i} className="flex items-start gap-3">
-              <span className="mt-0.5 flex-shrink-0 w-5 h-5 bg-green-50 text-green-600 rounded-full flex items-center justify-center text-xs font-bold">
-                ✓
-              </span>
+              <span className="mt-0.5 flex-shrink-0 w-5 h-5 bg-green-50 text-green-600 rounded-full flex items-center justify-center text-xs font-bold">✓</span>
               <span className="text-sm text-gray-700 leading-relaxed">{imp}</span>
             </li>
           ))}
         </ul>
       </div>
 
-
-      <ShareBar result={result} />
-
-      {/* Dashboard CTA */}
-      <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
-        <div className="space-y-1">
-          <h2 className="text-sm font-semibold text-gray-900">Track your competitors</h2>
-          <p className="text-xs text-gray-400">
-            See how your page stacks up, track competitor changes, and get weekly intel — free.
-          </p>
-        </div>
-
-        {isSignedIn ? (
-          <a
-            href="/dashboard"
-            className="w-full text-sm font-medium py-2.5 rounded-xl text-white transition-colors flex items-center justify-center gap-2"
-            style={{ backgroundColor: "#92400e" }}
-          >
-            Open dashboard →
-          </a>
-        ) : (
-          <SignInButton mode="modal" forceRedirectUrl="/dashboard">
-            <button
-              className="w-full text-sm font-medium py-2.5 rounded-xl text-white transition-colors"
-              style={{ backgroundColor: "#92400e" }}
-            >
-              Sign in with Google — it's free
-            </button>
-          </SignInButton>
-        )}
-      </div>
-
-      {/* Roast another */}
       <div className="flex justify-center">
-        <button
-          onClick={onRoastAnother}
-          className="text-white text-sm font-medium px-6 py-3 rounded-xl transition-colors" style={{ backgroundColor: "#92400e" }}
-        >
-          Roast another page
+        <button onClick={onRoastAnother} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+          ← Roast another page
         </button>
       </div>
     </div>

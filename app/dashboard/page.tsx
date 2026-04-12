@@ -409,23 +409,39 @@ export default function Dashboard() {
               {/* Empty state */}
               {!competitorsLoading && competitors.length === 0 && (
                 <div className="border border-dashed border-gray-200 rounded-xl p-10 text-center space-y-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 mb-1">No competitors yet</p>
-                    <p className="text-sm text-gray-400">Add a URL above, or let us find your competitors automatically.</p>
-                  </div>
-                  {roasts.length > 0 && (
-                    <button
-                      onClick={suggestCompetitors}
-                      disabled={suggestingCompetitors}
-                      className={BTN + " mx-auto"}
-                      style={BTN_COLOR}
-                    >
-                      {suggestingCompetitors ? (
-                        <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Finding competitors for {roasts[0].hostname}...</>
-                      ) : (
-                        `Find competitors for ${roasts[0].hostname}`
-                      )}
-                    </button>
+                  {roasts.length > 0 ? (
+                    <>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 mb-1">No competitors yet</p>
+                        <p className="text-sm text-gray-400">We'll find the top competitors for {roasts[0].hostname} and start tracking them.</p>
+                      </div>
+                      <button
+                        onClick={suggestCompetitors}
+                        disabled={suggestingCompetitors}
+                        className={BTN + " mx-auto"}
+                        style={BTN_COLOR}
+                      >
+                        {suggestingCompetitors ? (
+                          <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Finding competitors...</>
+                        ) : (
+                          `Find competitors for ${roasts[0].hostname}`
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 mb-1">No competitors yet</p>
+                        <p className="text-sm text-gray-400">Analyse your page first — we'll suggest competitors to track automatically.</p>
+                      </div>
+                      <button
+                        onClick={() => { setView("new"); setAnalysisResult(null); setAnalysisUrl(""); setAnalysisError(""); setNewComparison(null); }}
+                        className={BTN + " mx-auto"}
+                        style={BTN_COLOR}
+                      >
+                        Analyse my page first →
+                      </button>
+                    </>
                   )}
                 </div>
               )}
