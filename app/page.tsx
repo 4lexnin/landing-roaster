@@ -8,6 +8,13 @@ import { RoastResult } from "@/lib/types";
 type State = "idle" | "loading" | "done" | "error";
 type Tab = "roast" | "leaderboard";
 
+function isInAppBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  return /LinkedIn|Instagram|FBAN|FBAV|Twitter|Line\/|Musical\.ly|Snapchat/i.test(ua) ||
+    (/iPhone|iPad|Android/i.test(ua) && /GSA\//i.test(ua));
+}
+
 interface LeaderboardEntry {
   hostname: string;
   score: number;
@@ -181,8 +188,24 @@ export default function Home() {
     }
   }
 
+  const inApp = typeof window !== "undefined" && isInAppBrowser();
+
   return (
     <main className="min-h-screen bg-[#fafafa] font-sans">
+      {/* In-app browser warning */}
+      {inApp && (
+        <div className="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center px-8 text-center">
+          <div className="text-4xl mb-4">🌐</div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Open in your browser</h2>
+          <p className="text-sm text-gray-500 leading-relaxed mb-6">
+            Google sign-in doesn't work inside the LinkedIn app.<br />
+            Open this page in Safari or Chrome instead.
+          </p>
+          <div className="bg-gray-100 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 select-all">
+            roaster.ink
+          </div>
+        </div>
+      )}
       {/* Nav */}
       <div className="fixed top-0 right-0 p-4 z-50 flex items-center gap-3">
         {isSignedIn && (
