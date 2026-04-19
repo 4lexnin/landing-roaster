@@ -190,9 +190,9 @@ async function generateInsight(hostname: string, changes: Change[]): Promise<str
     model: "gpt-4o-mini",
     messages: [{
       role: "user",
-      content: `Competitive analyst: ${hostname} just made these landing page changes:\n\n${formatChangesForAI(changes)}\n\nIn 1-2 sentences: what does this signal about their strategy, and what should their competitors do about it? Be direct and actionable.`,
+      content: `${hostname} just made these landing page changes:\n\n${formatChangesForAI(changes)}\n\nOne sentence: what strategic move does this signal? Then one sentence: what should a competitor do RIGHT NOW? No fluff, no hedging. Max 25 words per sentence.`,
     }],
-    max_tokens: 120,
+    max_tokens: 80,
     temperature: 0.7,
   });
   return res.choices[0].message.content?.trim() ?? "";
