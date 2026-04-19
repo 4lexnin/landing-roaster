@@ -289,8 +289,8 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen flex bg-white font-sans">
 
-      {/* Sidebar */}
-      <aside className="w-52 shrink-0 border-r border-gray-100 flex flex-col h-screen sticky top-0">
+      {/* Sidebar — desktop only */}
+      <aside className="hidden md:flex w-52 shrink-0 border-r border-gray-100 flex-col h-screen sticky top-0">
         <div className="px-5 py-5">
           <div className="flex items-center gap-2">
             <span className="text-lg">🍞</span>
@@ -336,8 +336,17 @@ export default function Dashboard() {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-8 py-10">
+      <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
+        {/* Mobile top bar */}
+        <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🍞</span>
+            <span className="text-sm font-semibold text-gray-900">Roaster</span>
+          </div>
+          <UserButton />
+        </div>
+
+        <div className="max-w-3xl mx-auto px-4 md:px-8 py-6 md:py-10">
 
           {/* ── Market Intel ── */}
           {view === "intel" && (
@@ -898,6 +907,25 @@ export default function Dashboard() {
 
         </div>
       </main>
+
+      {/* Mobile bottom nav */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex z-50">
+        {([
+          ["intel", "Market Intel"],
+          ["analyses", "Your Pages"],
+          ["new", "Run Analysis"],
+        ] as const).map(([v, label]) => (
+          <button
+            key={v}
+            onClick={() => { if (v === "new") { setAnalysisResult(null); setAnalysisUrl(""); setAnalysisError(""); } setView(v); }}
+            className={`flex-1 py-3 text-xs font-medium transition-colors ${
+              view === v ? "text-gray-900 border-t-2 border-gray-900 -mt-px" : "text-gray-400"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }
