@@ -55,17 +55,31 @@ function scoreLabel(score: number) {
   return "text-red-600 bg-red-50";
 }
 
-function changeText(c: Change): string {
-  if (c.type === "headline") return `Headline changed`;
-  if (c.type === "cta_added") return `New CTA: "${c.value}"`;
-  if (c.type === "cta_removed") return `CTA removed: "${c.value}"`;
-  if (c.type === "social_proof") return c.added ? "Social proof added" : "Social proof removed";
-  if (c.type === "pricing") return c.added ? "Pricing section appeared" : "Pricing section removed";
-  if (c.type === "nav_added") return `New page: ${c.value}`;
-  if (c.type === "nav_removed") return `Page removed: ${c.value}`;
-  if (c.type === "client_added") return `New client: ${c.value}`;
-  if (c.type === "client_removed") return `Client removed: ${c.value}`;
-  return "";
+function groupChanges(changes: Change[]) {
+  const headline = changes.find(c => c.type === "headline");
+  const ctaAdded = changes.filter(c => c.type === "cta_added").map(c => c.value as string);
+  const ctaRemoved = changes.filter(c => c.type === "cta_removed").map(c => c.value as string);
+  const navAdded = changes.filter(c => c.type === "nav_added").map(c => c.value as string);
+  const navRemoved = changes.filter(c => c.type === "nav_removed").map(c => c.value as string);
+  const clientAdded = changes.filter(c => c.type === "client_added").map(c => c.value as string);
+  const clientRemoved = changes.filter(c => c.type === "client_removed").map(c => c.value as string);
+  const socialProof = changes.find(c => c.type === "social_proof");
+  const pricing = changes.find(c => c.type === "pricing");
+
+  const groups: { label: string; detail?: string; added?: boolean }[] = [];
+
+  if (headline) groups.push({ label: "Headline changed", detail: `"${headline.from}" → "${headline.to}"` });
+  if (socialProof) groups.push({ label: socialProof.added ? "Social proof added" : "Social proof removed", added: socialProof.added });
+  if (pricing) groups.push({ label: pricing.added ? "Pricing appeared" : "Pricing removed", added: pricing.added });
+
+  if (ctaAdded.length) groups.push({ label: ctaAdded.length === 1 ? `New CTA: "${ctaAdded[0]}"` : `${ctaAdded.length} CTAs added`, detail: ctaAdded.length > 1 ? ctaAdded.join(", ") : undefined, added: true });
+  if (ctaRemoved.length) groups.push({ label: ctaRemoved.length === 1 ? `CTA removed: "${ctaRemoved[0]}"` : `${ctaRemoved.length} CTAs removed`, detail: ctaRemoved.length > 1 ? ctaRemoved.join(", ") : undefined });
+  if (clientAdded.length) groups.push({ label: clientAdded.length === 1 ? `New client: ${clientAdded[0]}` : `${clientAdded.length} new clients`, detail: clientAdded.length > 1 ? clientAdded.join(", ") : undefined, added: true });
+  if (clientRemoved.length) groups.push({ label: clientRemoved.length === 1 ? `Client removed: ${clientRemoved[0]}` : `${clientRemoved.length} clients removed`, detail: clientRemoved.length > 1 ? clientRemoved.join(", ") : undefined });
+  if (navAdded.length) groups.push({ label: `${navAdded.length} page${navAdded.length > 1 ? "s" : ""} added`, detail: navAdded.join(", "), added: true });
+  if (navRemoved.length) groups.push({ label: `${navRemoved.length} page${navRemoved.length > 1 ? "s" : ""} removed`, detail: navRemoved.join(", ") });
+
+  return groups;
 }
 
 export default function Dashboard() {
@@ -524,35 +538,41 @@ export default function Dashboard() {
 
                               {/* Changes feed */}
                               <div>
-                                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Changes</p>
+                                <div className="flex items-center justify-between mb-3">
+                                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Detected changes</p>
+                                  {result.changes.length > 0 && (
+                                    <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                                      {groupChanges(result.changes).length} signal{groupChanges(result.changes).length !== 1 ? "s" : ""}
+                                    </span>
+                                  )}
+                                </div>
                                 {result.changes.length > 0 ? (
-                                  <div className="space-y-3">
-                                    <ul className="space-y-1">
-                                      {result.changes.map((c, i) => (
-                                        <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
-                                          <span className="text-gray-300 mt-0.5 shrink-0">·</span>
-                                          <span>
-                                            {changeText(c)}
-                                            {c.type === "headline" && c.from && (
-                                              <span className="text-gray-400 ml-1.5 text-xs">"{c.from}" → "{c.to}"</span>
-                                            )}
-                                          </span>
-                                        </li>
-                                      ))}
-                                    </ul>
+                                  <div className="space-y-2">
+                                    {groupChanges(result.changes).map((g, i) => (
+                                      <div key={i} className={`flex items-start gap-3 rounded-lg px-3 py-2.5 ${g.added ? "bg-emerald-50" : "bg-red-50"}`}>
+                                        <span className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold mt-0.5 ${g.added ? "bg-emerald-100 text-emerald-600" : "bg-red-100 text-red-500"}`}>
+                                          {g.added ? "+" : "−"}
+                                        </span>
+                                        <div className="min-w-0">
+                                          <p className={`text-sm font-medium ${g.added ? "text-emerald-900" : "text-red-900"}`}>{g.label}</p>
+                                          {g.detail && <p className="text-xs text-gray-400 mt-0.5 truncate">{g.detail}</p>}
+                                        </div>
+                                      </div>
+                                    ))}
                                     {result.aiInsight && (
-                                      <div className="bg-gray-50 rounded-lg px-3.5 py-3">
-                                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">What this means</p>
-                                        <p className="text-sm text-gray-700">{result.aiInsight}</p>
+                                      <div className="mt-3 border-l-2 border-gray-200 pl-3 py-1">
+                                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">What this signals</p>
+                                        <p className="text-sm text-gray-600 leading-relaxed">{result.aiInsight}</p>
                                       </div>
                                     )}
                                   </div>
                                 ) : (
-                                  <p className="text-sm text-gray-400">
+                                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
                                     {result.isFirstRun
                                       ? "Tracking started — changes will surface here as they happen"
                                       : "Stable — no major changes since last scan"}
-                                  </p>
+                                  </div>
                                 )}
                               </div>
 
